@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Geo-tagged report media (photos/videos of cracks, slope movement, blocked roads).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /report_media/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 25 * 1024 * 1024; // 25MB cap
+    }
+  }
+}

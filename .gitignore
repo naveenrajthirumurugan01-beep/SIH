@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Backend secrets
+backend/.env
+backend/firebase-service-account.json
+
+# ML artifacts
+ml/data/raw/*
+!ml/data/raw/.gitkeep
+ml/data/processed/*
+!ml/data/processed/.gitkeep
+ml/models/*.joblib
+ml/.ipynb_checkpoints/
+
+# Node / Firebase Functions
+functions/node_modules/
+functions/lib/
+firebase-debug.log
+firebase-debug.*.log
+.firebase/
+
+# Flutter (app/ has its own .gitignore too, this covers the root view)
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/build/
+app/android/local.properties
+app/ios/Flutter/Generated.xcconfig
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
