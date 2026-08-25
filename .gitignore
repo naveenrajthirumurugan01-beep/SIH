@@ -10,6 +10,11 @@ venv/
 backend/.env
 backend/firebase-service-account.json
 
+# Secrets, generally
+*.env
+*firebase*key*.json
+*serviceAccount*.json
+
 # ML artifacts
 ml/data/raw/*
 !ml/data/raw/.gitkeep
@@ -32,6 +37,9 @@ app/.flutter-plugins-dependencies
 app/build/
 app/android/local.properties
 app/ios/Flutter/Generated.xcconfig
+app/android/app/google-services.json
+app/ios/Runner/GoogleService-Info.plist
+app/*.iml
 
 # Editors / OS
 .vscode/
