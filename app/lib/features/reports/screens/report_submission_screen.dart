@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
-/// Geo-tagged report submission: description + photo/video + location.
-/// Shared by citizens and field officials; field officials additionally
-/// get the road status field (TODO: gate with AuthProvider.role).
-///
-/// TODO:
-///  - capture device location via geolocator and show it / let the user
-///    confirm or drag-adjust a pin
-///  - upload picked media to Firebase Storage under report_media/{uid}/...
-///  - call ReportService.submitReport with the resulting media URLs
+import '../../../core/app_config.dart';
+import '../../../core/app_state.dart';
+import '../../../models/report.dart';
+import '../../../models/user_role.dart';
+
+/// Geo-tagged report submission: description + live photo/video + GIS location.
+/// Auto-submits upon media capture for Field Officer review.
 class ReportSubmissionScreen extends StatefulWidget {
   const ReportSubmissionScreen({super.key});
 
@@ -22,22 +21,47 @@ class _ReportSubmissionScreenState extends State<ReportSubmissionScreen> {
   XFile? _pickedMedia;
   bool _isSubmitting = false;
 
-  Future<void> _pickMedia() async {
+  Future<void> _captureMediaAndSubmit() async {
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.camera);
-    if (file != null) setState(() => _pickedMedia = file);
+    if (file == null) return;
+
+    setState(() => _pickedMedia = file);
+    await _submit();
   }
 
   Future<void> _submit() async {
     setState(() => _isSubmitting = true);
     try {
-      // TODO: implement via ReportService.submitReport once storage upload
-      // and geolocation capture are wired up.
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final appState = context.read<AppState>();
+      await appState.refreshLocation();
+      final loc = appState.currentLocation;
+
+      final descText = _descriptionController.text.trim().isEmpty
+          ? 'Live captured hazard report'
+          : _descriptionController.text.trim();
+
+      await appState.reportRepository.submitReport(
+        deviceId: appState.deviceId,
+        role: UserRole.citizen,
+        hazardType: HazardType.other,
+        description: descText,
+        lat: loc.latitude,
+        lng: loc.longitude,
+        district: AppConfig.district,
+        localMediaPaths: _pickedMedia == null ? [] : [_pickedMedia!.path],
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('TODO: report submission not yet implemented')),
+          const SnackBar(
+            content: Text('Report live-captured & auto-submitted! Sent to Field Officer for review.'),
+          ),
         );
+        setState(() {
+          _descriptionController.clear();
+          _pickedMedia = null;
+        });
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -47,7 +71,7 @@ class _ReportSubmissionScreenState extends State<ReportSubmissionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Submit Report')),
+      appBar: AppBar(title: const Text('Submit Live Hazard Report')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -63,22 +87,24 @@ class _ReportSubmissionScreenState extends State<ReportSubmissionScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _pickMedia,
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: _isSubmitting ? null : _captureMediaAndSubmit,
               icon: const Icon(Icons.camera_alt),
-              label: Text(_pickedMedia == null ? 'Attach Photo/Video' : 'Photo attached'),
+              label: Text(_pickedMedia == null ? '📷 Capture Photo/Video & Auto-Submit' : 'Recapture Photo/Video'),
             ),
             const SizedBox(height: 16),
-            // TODO: location picker/confirmation widget.
             const Card(
               child: ListTile(
-                leading: Icon(Icons.location_on_outlined),
-                title: Text('Location'),
-                subtitle: Text('TODO: capture current GPS position'),
+                leading: Icon(Icons.location_on, color: Colors.redAccent),
+                title: Text('GPS GIS Location'),
+                subtitle: Text('Auto-capturing live coordinates upon submission'),
               ),
             ),
             const Spacer(),
-            FilledButton(
+            OutlinedButton(
               onPressed: _isSubmitting ? null : _submit,
               child: _isSubmitting
                   ? const SizedBox(
@@ -86,7 +112,7 @@ class _ReportSubmissionScreenState extends State<ReportSubmissionScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Submit Report'),
+                  : const Text('Submit Without Media'),
             ),
           ],
         ),

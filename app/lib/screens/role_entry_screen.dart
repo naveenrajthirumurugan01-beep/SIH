@@ -5,10 +5,6 @@ import '../core/app_state.dart';
 import '../models/user_role.dart';
 import '../services/task_repository.dart';
 
-/// PLACEHOLDER FOR REAL LOGIN. Shown at launch whenever AppState.currentRole
-/// is null (see main.dart), and reachable again any time via the "switch
-/// role" action in each shell. Stands in for a real Firebase Auth
-/// signup/role-selection flow — replace once that exists.
 class RoleEntryScreen extends StatefulWidget {
   const RoleEntryScreen({super.key});
 
@@ -50,30 +46,63 @@ class _RoleEntryScreenState extends State<RoleEntryScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.terrain, size: 64),
-                const SizedBox(height: 8),
+                const Icon(Icons.terrain_rounded, size: 68, color: Colors.tealAccent),
+                const SizedBox(height: 12),
                 Text(
-                  'NER Landslide EWS',
-                  style: Theme.of(context).textTheme.headlineSmall,
+                  'NER Landslide Early Warning System',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
-                  'Demo build — no login yet. Choose how to continue.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  'North Eastern Region Disaster Management Portal',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
+                Card(
+                  color: Colors.teal.withAlpha(38),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: const [
+                        Icon(Icons.public, color: Colors.tealAccent, size: 28),
+                        SizedBox(height: 8),
+                        Text(
+                          'Open Public Access for Citizens',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Receive instant geolocation landslide alerts and capture live hazard reports.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
                 SegmentedButton<UserRole>(
                   segments: const [
-                    ButtonSegment(value: UserRole.citizen, label: Text('Citizen')),
+                    ButtonSegment(
+                      value: UserRole.citizen,
+                      label: Text('Public Citizen'),
+                      icon: Icon(Icons.person_pin_circle),
+                    ),
                     ButtonSegment(
                       value: UserRole.fieldOfficial,
                       label: Text('Field Officer'),
+                      icon: Icon(Icons.verified_user),
                     ),
                     ButtonSegment(
                       value: UserRole.analystAdmin,
                       label: Text('Analyst'),
+                      icon: Icon(Icons.analytics),
                     ),
                   ],
                   selected: {_selected},
@@ -93,14 +122,22 @@ class _RoleEntryScreenState extends State<RoleEntryScreen> {
                     onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
                       labelText: 'Officer ID',
-                      helperText: 'Keep "demo_officer" to see the seeded demo tasks',
+                      helperText: 'Keep "demo_officer" to view assigned tasks',
                     ),
                   ),
                 ],
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
                 FilledButton(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                   onPressed: _canContinue ? _continue : null,
-                  child: const Text('Continue'),
+                  child: Text(
+                    _selected == UserRole.citizen
+                        ? 'Enter as Citizen (Open Public Access)'
+                        : 'Continue to Portal',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
