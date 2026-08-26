@@ -48,6 +48,9 @@ dependencies:
   cached_network_image: ^3.4.1
   intl: ^0.20.3
   fl_chart: ^1.2.0
+  http: ^1.6.0
+  shared_preferences: ^2.5.5
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
