@@ -3,29 +3,9 @@ library;
 
 import 'package:flutter/material.dart';
 
+export '../../models/user_role.dart';
+
 enum RiskLevel { low, medium, high, veryHigh }
-
-enum UserRole { citizen, fieldOfficial, analystAdmin }
-
-extension UserRoleX on UserRole {
-  String get firestoreValue => switch (this) {
-        UserRole.citizen => 'citizen',
-        UserRole.fieldOfficial => 'field_official',
-        UserRole.analystAdmin => 'analyst_admin',
-      };
-
-  static UserRole fromFirestoreValue(String value) => switch (value) {
-        'field_official' => UserRole.fieldOfficial,
-        'analyst_admin' => UserRole.analystAdmin,
-        _ => UserRole.citizen,
-      };
-
-  String get label => switch (this) {
-        UserRole.citizen => 'Citizen',
-        UserRole.fieldOfficial => 'Field Official',
-        UserRole.analystAdmin => 'Analyst / Admin',
-      };
-}
 
 extension RiskLevelX on RiskLevel {
   /// Color-coded per the PS spec: green/amber/orange/red for
