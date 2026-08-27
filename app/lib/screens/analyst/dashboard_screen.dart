@@ -10,6 +10,7 @@ import '../../models/alert.dart';
 import '../../models/report.dart';
 import '../../models/risk_zone.dart';
 import '../../models/task.dart';
+import '../../services/auto_assignment_service.dart';
 import '../../widgets/hazard_icons.dart';
 import '../../widgets/risk_badge.dart';
 import '../../widgets/stat_tile.dart';
@@ -65,7 +66,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
   void _showZoneSheet(RiskZone zone) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Padding(
+      builder: (sheetContext) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -74,7 +75,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text(zone.name, style: Theme.of(context).textTheme.titleMedium),
+                  child: Text(zone.name, style: Theme.of(sheetContext).textTheme.titleMedium),
                 ),
                 RiskBadge(level: zone.level),
               ],
@@ -86,7 +87,40 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
               const SizedBox(height: 8),
               Text(zone.notes!),
             ],
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => _simulateAiDetection(sheetContext, zone),
+              icon: const Icon(Icons.smart_toy_outlined),
+              label: const Text('Simulate AI Detection'),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Demo-only stand-in for a real risk-engine trigger (no FastAPI backend
+  /// exists yet — see services/auto_assignment_service.dart). Creates an
+  /// automatically-assigned inspection task for [zone] exactly as a future
+  /// real trigger would, just fired by hand from here instead of a
+  /// scheduled/event-driven backend job.
+  Future<void> _simulateAiDetection(BuildContext sheetContext, RiskZone zone) async {
+    final appState = context.read<AppState>();
+    Navigator.of(sheetContext).pop();
+
+    final task = await autoAssignInspection(
+      zone: zone,
+      taskRepository: appState.taskRepository,
+      authRepository: appState.authRepository,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          task.assignedOfficerUid == null
+              ? 'Task created for ${zone.name}, but no Field Officer is available — left unassigned.'
+              : 'Task auto-assigned for ${zone.name}.',
         ),
       ),
     );

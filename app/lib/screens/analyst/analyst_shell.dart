@@ -44,9 +44,9 @@ class _AnalystShellState extends State<AnalystShell> {
             right: 8,
             child: SafeArea(
               child: IconButton.filledTonal(
-                icon: const Icon(Icons.swap_horiz),
-                tooltip: 'Switch role (demo)',
-                onPressed: appState.clearRole,
+                icon: const Icon(Icons.logout),
+                tooltip: 'Sign out',
+                onPressed: () => appState.authRepository.signOut(),
               ),
             ),
           ),

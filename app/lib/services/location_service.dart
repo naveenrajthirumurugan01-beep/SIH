@@ -42,7 +42,15 @@ class LocationService {
   /// Live position updates for the Field Officer geofence check. Emits
   /// nothing if permission is denied/GPS is off — callers should pair this
   /// with an initial [getCurrentOrFallback] call to still show something.
-  Stream<LatLng> watchPosition({int distanceFilterMeters = 5}) async* {
+  Stream<LatLng> watchPosition({int distanceFilterMeters = 5}) {
+    return watchPositionRaw(distanceFilterMeters: distanceFilterMeters)
+        .map((position) => LatLng(position.latitude, position.longitude));
+  }
+
+  /// Same as [watchPosition] but yields the raw [Position], for callers
+  /// that need `accuracy` too (e.g. the geofence check's "GPS accuracy
+  /// low" warning) rather than just a lat/lng.
+  Stream<Position> watchPositionRaw({int distanceFilterMeters = 5}) async* {
     if (!await _hasPermission()) return;
     if (!await Geolocator.isLocationServiceEnabled()) return;
 
@@ -51,6 +59,6 @@ class LocationService {
         accuracy: LocationAccuracy.high,
         distanceFilter: distanceFilterMeters,
       ),
-    ).map((position) => LatLng(position.latitude, position.longitude));
+    );
   }
 }

@@ -1,0 +1,104 @@
+rules_version = '2';
+
+// Deny-by-default; every collection below has an explicit allow. Roles and
+// approval state live on the caller's own users/{uid} doc (there are no
+// custom claims in this build — see app/lib/services/auth_repository.dart),
+// so most checks here read that one document via get().
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isEnabledAnalyst() {
+      return isSignedIn() && myProfile().role == 'analyst_admin' && myProfile().enabled == true;
+    }
+
+    function isEnabledFieldOfficer() {
+      return isSignedIn() && myProfile().role == 'field_official' && myProfile().enabled == true;
+    }
+
+    function isEnabledOfficerOrAnalyst() {
+      return isEnabledFieldOfficer() || isEnabledAnalyst();
+    }
+
+    // users/{uid}: a signed-in user may read their own profile, or any
+    // profile if they're an enabled analyst (needed for the Field Officer
+    // picker in the Analyst screens). Creation is self-service (Citizen
+    // sign-up writes the initial doc; Field Officer/Analyst accounts are
+    // fixed demo accounts whose doc is created once by an out-of-band
+    // bootstrap script instead — there is no in-app self-registration for
+    // those roles). A user may update their own doc's other fields, but
+    // never their own `role` or `enabled` — those are the two fields
+    // every enabled*() check above depends on, so letting a user touch
+    // either would be a straight privilege-escalation hole. Nothing in
+    // this app updates another user's doc at all anymore, so there is no
+    // cross-user write allowance here — `enabled` is only ever changed by
+    // editing the Firestore document directly (e.g. as a manual
+    // kill-switch to disable an account).
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isEnabledAnalyst());
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.role == resource.data.role
+                    && request.resource.data.enabled == resource.data.enabled;
+      allow delete: if isEnabledAnalyst();
+    }
+
+    // reports/{id}: any authenticated user (citizen or field officer) can
+    // file one. Only the submitter, or an enabled field officer/analyst,
+    // can read or update it afterwards (moderation, status transitions).
+    match /reports/{reportId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.reporter_uid == request.auth.uid || isEnabledOfficerOrAnalyst());
+      allow update: if isSignedIn() && (resource.data.reporter_uid == request.auth.uid || isEnabledOfficerOrAnalyst());
+      allow delete: if isEnabledAnalyst();
+    }
+
+    // risk_zones/{id}: read-only reference data for every signed-in user;
+    // only an enabled analyst (or, eventually, a backend service account
+    // running the ML pipeline) may write it.
+    match /risk_zones/{zoneId} {
+      allow read: if isSignedIn();
+      allow write: if isEnabledAnalyst();
+    }
+
+    // inspection_tasks/{id}: the assigned officer can read/update their
+    // own tasks (status transitions through the geofence/inspection
+    // flow); only an enabled analyst can create or delete a task, but can
+    // also read/update any of them.
+    match /inspection_tasks/{taskId} {
+      allow read: if isSignedIn() && (resource.data.assigned_officer_uid == request.auth.uid || isEnabledAnalyst());
+      allow create: if isEnabledAnalyst();
+      allow update: if isSignedIn() && (
+        (isEnabledFieldOfficer() && resource.data.assigned_officer_uid == request.auth.uid) ||
+        isEnabledAnalyst()
+      );
+      allow delete: if isEnabledAnalyst();
+    }
+
+    // field_inspections/{id}: only an enabled field officer can create a
+    // submission, and only under their own uid. The submitting officer or
+    // an enabled analyst can read/update/delete it afterwards.
+    match /field_inspections/{inspectionId} {
+      allow read: if isSignedIn() && (resource.data.officer_uid == request.auth.uid || isEnabledAnalyst());
+      allow create: if isEnabledFieldOfficer() && request.resource.data.officer_uid == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.officer_uid == request.auth.uid || isEnabledAnalyst());
+      allow delete: if isEnabledAnalyst();
+    }
+
+    // alerts/{id}: read-only for every signed-in user (citizens included —
+    // this is what they see in the Alerts tab); only an enabled analyst
+    // can issue one. Alert issuance is manual/analyst-approved in this
+    // build, not automatic — a deliberate scope decision, not a gap.
+    match /alerts/{alertId} {
+      allow read: if isSignedIn();
+      allow write: if isEnabledAnalyst();
+    }
+  }
+}

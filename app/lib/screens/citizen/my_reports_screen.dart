@@ -22,7 +22,7 @@ class MyReportsScreen extends StatelessWidget {
         title: const Text('My Reports', style: TextStyle(color: Colors.white)),
       ),
       body: StreamBuilder<List<Report>>(
-        stream: appState.reportRepository.watchMyReports(appState.deviceId),
+        stream: appState.reportRepository.watchMyReports(appState.uid),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());

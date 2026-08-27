@@ -9,15 +9,16 @@ import '../models/report.dart';
 import '../models/user_role.dart';
 
 abstract class ReportRepository {
-  /// Live list of reports submitted by [deviceId], newest first.
-  Stream<List<Report>> watchMyReports(String deviceId);
+  /// Live list of reports submitted by [uid] (a real Firebase Auth uid),
+  /// newest first.
+  Stream<List<Report>> watchMyReports(String uid);
 
   /// Live list of every report regardless of submitter, newest first. Used
   /// by the Analyst's reports queue and dashboard.
   Stream<List<Report>> watchAllReports();
 
   Future<Report> submitReport({
-    required String deviceId,
+    required String uid,
     required UserRole role,
     required HazardType hazardType,
     required String description,
@@ -49,17 +50,15 @@ class MockReportRepository implements ReportRepository {
   final StreamController<void> _changes = StreamController<void>.broadcast();
   int _nextId = 1;
 
-  /// Seeds the demo crack report under [citizenDeviceId] the first time
-  /// this is called, so a single demo run can show the full loop: submit
-  /// as Citizen (or just launch, since this seeds it automatically) ->
-  /// inspect as Field Officer -> see the status change back in the
-  /// Citizen's My Reports tab. No-op if already seeded.
-  void seedDemoDataIfNeeded(String citizenDeviceId) {
+  /// Seeds the demo crack report under [citizenUid] the first time this is
+  /// called; not called automatically anymore now that real accounts
+  /// exist, but kept for local mock-mode testing. No-op if already seeded.
+  void seedDemoDataIfNeeded(String citizenUid) {
     if (_reports.any((r) => r.id == demoSeedReportId)) return;
     _reports.add(
       Report(
         id: demoSeedReportId,
-        reporterUid: citizenDeviceId,
+        reporterUid: citizenUid,
         reporterRole: UserRole.citizen,
         hazardType: HazardType.crack,
         description:
@@ -77,8 +76,8 @@ class MockReportRepository implements ReportRepository {
     _changes.add(null);
   }
 
-  List<Report> _filtered(String deviceId) {
-    final mine = _reports.where((r) => r.reporterUid == deviceId).toList()
+  List<Report> _filtered(String uid) {
+    final mine = _reports.where((r) => r.reporterUid == uid).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return mine;
   }
@@ -89,10 +88,10 @@ class MockReportRepository implements ReportRepository {
   }
 
   @override
-  Stream<List<Report>> watchMyReports(String deviceId) async* {
-    yield _filtered(deviceId);
+  Stream<List<Report>> watchMyReports(String uid) async* {
+    yield _filtered(uid);
     await for (final _ in _changes.stream) {
-      yield _filtered(deviceId);
+      yield _filtered(uid);
     }
   }
 
@@ -106,7 +105,7 @@ class MockReportRepository implements ReportRepository {
 
   @override
   Future<Report> submitReport({
-    required String deviceId,
+    required String uid,
     required UserRole role,
     required HazardType hazardType,
     required String description,
@@ -119,7 +118,7 @@ class MockReportRepository implements ReportRepository {
 
     final report = Report(
       id: 'mock_report_${_nextId++}',
-      reporterUid: deviceId,
+      reporterUid: uid,
       reporterRole: role,
       hazardType: hazardType,
       description: description,
@@ -147,16 +146,16 @@ class MockReportRepository implements ReportRepository {
 }
 
 /// Writes to the `reports` Firestore collection and uploads media to
-/// Firebase Storage under report_media/{deviceId}/...
+/// Firebase Storage under report_media/{uid}/...
 class FirestoreReportRepository implements ReportRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const _collection = 'reports';
 
   @override
-  Stream<List<Report>> watchMyReports(String deviceId) {
+  Stream<List<Report>> watchMyReports(String uid) {
     return _firestore
         .collection(_collection)
-        .where('reporter_uid', isEqualTo: deviceId)
+        .where('reporter_uid', isEqualTo: uid)
         .orderBy('created_at', descending: true)
         .snapshots()
         .map((snapshot) =>
@@ -175,7 +174,7 @@ class FirestoreReportRepository implements ReportRepository {
 
   @override
   Future<Report> submitReport({
-    required String deviceId,
+    required String uid,
     required UserRole role,
     required HazardType hazardType,
     required String description,
@@ -185,12 +184,12 @@ class FirestoreReportRepository implements ReportRepository {
     List<String> localMediaPaths = const [],
   }) async {
     final mediaUrls = await Future.wait(
-      localMediaPaths.map((path) => _uploadMedia(deviceId, path)),
+      localMediaPaths.map((path) => _uploadMedia(uid, path)),
     );
 
     final report = Report(
       id: '', // assigned by Firestore below
-      reporterUid: deviceId,
+      reporterUid: uid,
       reporterRole: role,
       hazardType: hazardType,
       description: description,
@@ -215,9 +214,9 @@ class FirestoreReportRepository implements ReportRepository {
         .update({'status': newStatus.firestoreValue});
   }
 
-  Future<String> _uploadMedia(String deviceId, String localPath) async {
+  Future<String> _uploadMedia(String uid, String localPath) async {
     final fileName = '${DateTime.now().microsecondsSinceEpoch}_${localPath.split(Platform.pathSeparator).last}';
-    final ref = FirebaseStorage.instance.ref('report_media/$deviceId/$fileName');
+    final ref = FirebaseStorage.instance.ref('report_media/$uid/$fileName');
     await ref.putFile(File(localPath));
     return ref.getDownloadURL();
   }

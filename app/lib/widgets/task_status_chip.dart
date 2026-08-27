@@ -5,6 +5,7 @@ import '../models/task.dart';
 /// Shared with the Analyst dashboard's task-pin map layer, so a task's
 /// color means the same thing everywhere it appears.
 Color colorForTaskStatus(InspectionTaskStatus status) => switch (status) {
+      InspectionTaskStatus.unassigned => Colors.grey,
       InspectionTaskStatus.assigned => Colors.blueGrey,
       InspectionTaskStatus.enRoute => const Color(0xFFF9A825),
       InspectionTaskStatus.onSite => const Color(0xFFEF6C00),

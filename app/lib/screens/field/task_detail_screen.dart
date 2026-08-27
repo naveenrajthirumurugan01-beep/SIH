@@ -73,7 +73,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             child: ListTile(
               leading: const Icon(Icons.location_on),
               title: Text('Lat ${task.lat.toStringAsFixed(5)}, Lng ${task.lng.toStringAsFixed(5)}'),
-              subtitle: const Text('A ~100m geofence around this point applies.'),
+              subtitle: Text(
+                'A ${task.geofence.radiusMeters.toStringAsFixed(0)}m geofence around this point applies.',
+              ),
             ),
           ),
           const SizedBox(height: 24),
