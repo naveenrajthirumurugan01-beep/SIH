@@ -1,11 +1,7 @@
 enum CrackStatus { none, minor, major }
 
 extension CrackStatusX on CrackStatus {
-  String get firestoreValue => switch (this) {
-        CrackStatus.none => 'none',
-        CrackStatus.minor => 'minor',
-        CrackStatus.major => 'major',
-      };
+  String get firestoreValue => name;
 
   String get label => switch (this) {
         CrackStatus.none => 'None',
@@ -13,54 +9,108 @@ extension CrackStatusX on CrackStatus {
         CrackStatus.major => 'Major',
       };
 
-  static CrackStatus fromFirestoreValue(String value) => switch (value) {
+  static CrackStatus fromFirestoreValue(String value) => switch (value.toLowerCase()) {
         'minor' => CrackStatus.minor,
         'major' => CrackStatus.major,
         _ => CrackStatus.none,
       };
 }
 
-enum SlopeMovement { none, minor, significant }
+enum SlopeMovement { none, minor, moderate, severe }
 
 extension SlopeMovementX on SlopeMovement {
-  String get firestoreValue => switch (this) {
-        SlopeMovement.none => 'none',
-        SlopeMovement.minor => 'minor',
-        SlopeMovement.significant => 'significant',
-      };
+  String get firestoreValue => name;
 
   String get label => switch (this) {
         SlopeMovement.none => 'None',
         SlopeMovement.minor => 'Minor',
-        SlopeMovement.significant => 'Significant',
+        SlopeMovement.moderate => 'Moderate',
+        SlopeMovement.severe => 'Severe',
       };
 
-  static SlopeMovement fromFirestoreValue(String value) => switch (value) {
+  static SlopeMovement fromFirestoreValue(String value) => switch (value.toLowerCase()) {
         'minor' => SlopeMovement.minor,
-        'significant' => SlopeMovement.significant,
+        'moderate' => SlopeMovement.moderate,
+        'severe' => SlopeMovement.severe,
         _ => SlopeMovement.none,
       };
 }
 
-enum RoadCondition { open, partiallyBlocked, blocked }
+enum RoadCondition { normal, damaged, blocked }
 
 extension RoadConditionX on RoadCondition {
-  String get firestoreValue => switch (this) {
-        RoadCondition.open => 'open',
-        RoadCondition.partiallyBlocked => 'partially_blocked',
-        RoadCondition.blocked => 'blocked',
-      };
+  String get firestoreValue => name;
 
   String get label => switch (this) {
-        RoadCondition.open => 'Open',
-        RoadCondition.partiallyBlocked => 'Partially Blocked',
+        RoadCondition.normal => 'Normal',
+        RoadCondition.damaged => 'Damaged',
         RoadCondition.blocked => 'Blocked',
       };
 
-  static RoadCondition fromFirestoreValue(String value) => switch (value) {
-        'partially_blocked' => RoadCondition.partiallyBlocked,
+  static RoadCondition fromFirestoreValue(String value) => switch (value.toLowerCase()) {
+        'damaged' || 'partially_blocked' => RoadCondition.damaged,
         'blocked' => RoadCondition.blocked,
-        _ => RoadCondition.open,
+        _ => RoadCondition.normal,
+      };
+}
+
+enum OverallObservation { safe, monitor, highRisk, critical }
+
+extension OverallObservationX on OverallObservation {
+  String get firestoreValue => name;
+
+  String get label => switch (this) {
+        OverallObservation.safe => 'SAFE',
+        OverallObservation.monitor => 'MONITOR',
+        OverallObservation.highRisk => 'HIGH RISK',
+        OverallObservation.critical => 'CRITICAL',
+      };
+
+  static OverallObservation fromFirestoreValue(String value) => switch (value.toLowerCase()) {
+        'monitor' => OverallObservation.monitor,
+        'highrisk' || 'high_risk' => OverallObservation.highRisk,
+        'critical' => OverallObservation.critical,
+        _ => OverallObservation.safe,
+      };
+}
+
+/// Recorded Field Observation for an Inspection ID (Phase 8)
+class FieldObservation {
+  final String inspectionId;
+  final String officerUid;
+  final CrackStatus crack;
+  final SlopeMovement slopeMovement;
+  final bool rockfall;
+  final bool waterSeepage;
+  final RoadCondition roadCondition;
+  final OverallObservation overallObservation;
+  final String remarks;
+  final DateTime recordedAt;
+
+  const FieldObservation({
+    required this.inspectionId,
+    required this.officerUid,
+    required this.crack,
+    required this.slopeMovement,
+    required this.rockfall,
+    required this.waterSeepage,
+    required this.roadCondition,
+    required this.overallObservation,
+    required this.remarks,
+    required this.recordedAt,
+  });
+
+  Map<String, dynamic> toFirestore() => {
+        'inspection_id': inspectionId,
+        'officer_uid': officerUid,
+        'crack': crack.firestoreValue,
+        'slope_movement': slopeMovement.firestoreValue,
+        'rockfall': rockfall,
+        'water_seepage': waterSeepage,
+        'road_condition': roadCondition.firestoreValue,
+        'overall_observation': overallObservation.firestoreValue,
+        'remarks': remarks,
+        'recorded_at': recordedAt.toIso8601String(),
       };
 }
 
@@ -114,7 +164,7 @@ class FieldInspection {
       slopeMovement != SlopeMovement.none ||
       rockfall ||
       waterSeepage ||
-      roadCondition != RoadCondition.open;
+      roadCondition != RoadCondition.normal;
 
   factory FieldInspection.fromFirestore(String id, Map<String, dynamic> data) {
     return FieldInspection(
