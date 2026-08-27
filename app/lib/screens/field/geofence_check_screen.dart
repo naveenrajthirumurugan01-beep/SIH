@@ -1,27 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
-import '../../core/geo_utils.dart';
+import '../../features/auth/providers/auth_provider.dart';
+import '../../models/location_verification.dart';
 import '../../models/task.dart';
 import '../../services/location_service.dart';
-import '../../widgets/geofence_indicator.dart';
+import '../../services/location_verifier.dart';
+import '../../services/task_repository.dart';
 import 'inspection_form_screen.dart';
 
-/// Minimum GPS accuracy (meters, per Geolocator's reported horizontal
-/// accuracy) below which we don't trust the fix enough to silently accept
-/// it — worse than this shows a warning instead of just proceeding.
-const _minTrustedAccuracyMeters = 100.0;
-
-/// Live distance-to-target check. The officer must physically be within
-/// the task's geofence radius (set at task-creation time based on risk
-/// severity — see core/geofence_utils.dart) before "Start Inspection"
-/// unlocks — this is what makes the field report trustworthy (no
-/// desk-filing an inspection from home).
+/// Location Verification Screen for Field Officer Inspection (Phase 7).
+/// Evaluates and displays the 5 formal location verification states:
+/// 1. GPS Unavailable
+/// 2. GPS Accuracy Too Poor
+/// 3. Outside Inspection Zone
+/// 4. Inside Inspection Zone
+/// 5. LOCATION VERIFIED
 class GeofenceCheckScreen extends StatefulWidget {
   final InspectionTask task;
 
@@ -33,16 +31,10 @@ class GeofenceCheckScreen extends StatefulWidget {
 
 class _GeofenceCheckScreenState extends State<GeofenceCheckScreen> {
   final _locationService = LocationService();
-  StreamSubscription<Position>? _subscription;
+  StreamSubscription<FieldGpsFix>? _subscription;
 
-  double? _distanceMeters;
-  bool _isWithin = false;
-  LatLng? _lastPosition;
-
-  /// Null until a real GPS fix (via [LocationService.watchPositionRaw])
-  /// comes in — the initial [LocationService.getCurrentOrFallback] call
-  /// doesn't report accuracy, so it shouldn't trip the low-accuracy warning.
-  double? _lastAccuracyMeters;
+  FieldGpsFix? _currentFix;
+  LocationVerificationRecord? _verificationRecord;
 
   @override
   void initState() {
@@ -51,30 +43,27 @@ class _GeofenceCheckScreenState extends State<GeofenceCheckScreen> {
   }
 
   Future<void> _init() async {
-    final initial = await _locationService.getCurrentOrFallback();
-    _onPosition(point: initial, accuracyMeters: null);
-    _subscription = _locationService.watchPositionRaw().listen(
-          (position) => _onPosition(
-            point: LatLng(position.latitude, position.longitude),
-            accuracyMeters: position.accuracy,
-          ),
-        );
+    final initial = await _locationService.getFieldGpsFix();
+    _processFix(initial);
+    _subscription = _locationService.watchFieldGpsFix().listen(_processFix);
   }
 
-  void _onPosition({required LatLng point, required double? accuracyMeters}) {
+  void _processFix(FieldGpsFix fix) {
     if (!mounted) return;
-    final geofence = widget.task.geofence;
-    final meters = distanceMeters(
-      point.latitude,
-      point.longitude,
-      geofence.centerLat,
-      geofence.centerLng,
+
+    final appState = context.read<AppState>();
+    final authProvider = context.read<AuthProvider>();
+    final officerUid = authProvider.profile?.uid ?? appState.officerId ?? demoOfficerUid;
+
+    final record = LocationVerifier.evaluate(
+      fix: fix,
+      task: widget.task,
+      officerUid: officerUid,
     );
+
     setState(() {
-      _lastPosition = point;
-      _lastAccuracyMeters = accuracyMeters;
-      _distanceMeters = meters;
-      _isWithin = isInsideGeofence(point.latitude, point.longitude, geofence);
+      _currentFix = fix;
+      _verificationRecord = record;
     });
   }
 
@@ -84,81 +73,327 @@ class _GeofenceCheckScreenState extends State<GeofenceCheckScreen> {
     super.dispose();
   }
 
-  Future<void> _proceed() async {
-    if (!_isWithin || _lastPosition == null) return;
+  @override
+  Widget build(BuildContext context) {
+    final task = widget.task;
+    final record = _verificationRecord;
 
-    final appState = context.read<AppState>();
-    await appState.taskRepository.updateTaskStatus(widget.task.id, InspectionTaskStatus.onSite);
-    if (!mounted) return;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Location Verification — ${task.id}'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 1. Verification State Banner Card
+            _buildStateBannerCard(context, record),
+            const SizedBox(height: 16),
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => InspectionFormScreen(
-          task: widget.task.copyWith(status: InspectionTaskStatus.onSite),
-          checkInLat: _lastPosition!.latitude,
-          checkInLng: _lastPosition!.longitude,
-          checkInAt: DateTime.now(),
+            // 2. Recorded Verification Proof Card (when Location Verified)
+            if (record != null && record.isVerified) ...[
+              _buildVerifiedProofCard(context, record),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => InspectionFormScreen(
+                          task: widget.task,
+                          verificationRecord: record,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.assignment_turned_in, size: 24),
+                  label: const Text(
+                    'PROCEED TO FIELD OBSERVATION FORM',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // 3. Inspection & Geofence Boundary Target Summary Card
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'INSPECTION GEOFENCE TARGET',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                    ),
+                    const Divider(height: 20),
+                    _RowItem(label: 'Inspection ID', value: task.id),
+                    _RowItem(label: 'Risk Zone ID', value: task.riskZoneId),
+                    _RowItem(label: 'Boundary Specification', value: task.boundary.boundaryDescription),
+                    _RowItem(
+                      label: 'Target Coordinates',
+                      value: '${task.lat.toStringAsFixed(5)}, ${task.lng.toStringAsFixed(5)}',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // 4. Clear Recovery Actions based on failure state
+            if (record != null && !record.isVerified) ...[
+              _buildRecoveryActionSection(context, record.state),
+            ],
+          ],
         ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final radiusMeters = widget.task.geofence.radiusMeters;
-    final lowAccuracy =
-        _lastAccuracyMeters != null && _lastAccuracyMeters! > _minTrustedAccuracyMeters;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Geofence Check')),
-      body: Center(
+  Widget _buildStateBannerCard(BuildContext context, LocationVerificationRecord? record) {
+    if (record == null) {
+      return const Card(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(20),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              if (_distanceMeters == null)
-                const CircularProgressIndicator()
-              else
-                GeofenceProgressIndicator(
-                  distanceMeters: _distanceMeters!,
-                  radiusMeters: radiusMeters,
-                ),
-              const SizedBox(height: 16),
-              if (lowAccuracy)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.gps_not_fixed, color: Theme.of(context).colorScheme.error),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'GPS accuracy low (±${_lastAccuracyMeters!.toStringAsFixed(0)}m) — '
-                          'move to open sky before relying on this check.',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              Text(
-                'You must be within ${radiusMeters.toStringAsFixed(0)}m of the target '
-                'location before starting the inspection.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _isWithin ? _proceed : null,
-                child: const Text('Start Inspection'),
-              ),
+              CircularProgressIndicator(),
+              SizedBox(height: 12),
+              Text('Evaluating GPS & Dynamic Geofence Criteria...'),
             ],
           ),
         ),
+      );
+    }
+
+    Color stateColor;
+    IconData stateIcon;
+    String stateTitle;
+
+    switch (record.state) {
+      case LocationVerificationState.locationVerified:
+        stateColor = const Color(0xFF2E7D32);
+        stateIcon = Icons.verified_user_rounded;
+        stateTitle = 'STATE 5: LOCATION VERIFIED';
+        break;
+      case LocationVerificationState.insideInspectionZone:
+        stateColor = Colors.green.shade800;
+        stateIcon = Icons.location_on;
+        stateTitle = 'STATE 4: INSIDE INSPECTION ZONE';
+        break;
+      case LocationVerificationState.outsideInspectionZone:
+        stateColor = Colors.orange.shade800;
+        stateIcon = Icons.person_pin_circle_outlined;
+        stateTitle = 'STATE 3: OUTSIDE INSPECTION ZONE';
+        break;
+      case LocationVerificationState.accuracyTooPoor:
+        stateColor = Colors.deepOrange.shade800;
+        stateIcon = Icons.gps_off_rounded;
+        stateTitle = 'STATE 2: GPS ACCURACY TOO POOR';
+        break;
+      case LocationVerificationState.gpsUnavailable:
+      default:
+        stateColor = Colors.red.shade700;
+        stateIcon = Icons.portable_wifi_off;
+        stateTitle = 'STATE 1: GPS UNAVAILABLE';
+        break;
+    }
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: stateColor, width: 2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Icon(stateIcon, size: 52, color: stateColor),
+            const SizedBox(height: 12),
+            Text(
+              stateTitle,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+                color: stateColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              record.message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, height: 1.3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVerifiedProofCard(BuildContext context, LocationVerificationRecord record) {
+    final formattedTime = DateFormat('MMMM d, y • HH:mm:ss').format(record.timestamp);
+
+    return Card(
+      elevation: 3,
+      color: Colors.green.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.shield_outlined, color: Color(0xFF2E7D32)),
+                SizedBox(width: 8),
+                Text(
+                  'RECORDED VERIFICATION PROOF',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2E7D32),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20, color: Color(0xFF2E7D32)),
+            _ProofRow(label: 'Inspection ID', value: record.inspectionId),
+            _ProofRow(label: 'Field Officer ID', value: record.officerUid),
+            _ProofRow(
+              label: 'Verified Latitude',
+              value: record.latitude.toStringAsFixed(6),
+            ),
+            _ProofRow(
+              label: 'Verified Longitude',
+              value: record.longitude.toStringAsFixed(6),
+            ),
+            _ProofRow(
+              label: 'GPS Accuracy',
+              value: '±${record.gpsAccuracyMeters.toStringAsFixed(1)} m',
+            ),
+            _ProofRow(label: 'Verified Timestamp', value: formattedTime),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecoveryActionSection(BuildContext context, LocationVerificationState state) {
+    switch (state) {
+      case LocationVerificationState.gpsUnavailable:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'RECOVERY ACTION:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await _locationService.openLocationSettings();
+                setState(() {});
+              },
+              icon: const Icon(Icons.settings),
+              label: const Text('Turn On Location Services'),
+            ),
+          ],
+        );
+      case LocationVerificationState.accuracyTooPoor:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'RECOVERY ACTION:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+            ),
+            const SizedBox(height: 6),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() {});
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Move to Open Sky & Refresh Satellite Fix'),
+            ),
+          ],
+        );
+      case LocationVerificationState.outsideInspectionZone:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'RECOVERY ACTION:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {});
+              },
+              icon: const Icon(Icons.directions_walk),
+              label: const Text('Move Physical Position Closer to Zone Boundary'),
+            ),
+          ],
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+}
+
+class _RowItem extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _RowItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProofRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ProofRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.green.shade900)),
+          Text(
+            value,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+          ),
+        ],
       ),
     );
   }

@@ -11,6 +11,8 @@ import 'screens/citizen/citizen_shell.dart';
 import 'screens/field/field_officer_shell.dart';
 import 'screens/role_select_screen.dart';
 
+import 'services/field_officer_sync_service.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -18,19 +20,30 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final appState = await AppState.create();
+  final syncService = FieldOfficerSyncService();
+  await syncService.initialize();
 
-  runApp(LandslideEwsApp(appState: appState));
+  runApp(LandslideEwsApp(appState: appState, syncService: syncService));
 }
 
 class LandslideEwsApp extends StatelessWidget {
   final AppState appState;
+  final FieldOfficerSyncService syncService;
 
-  const LandslideEwsApp({super.key, required this.appState});
+  const LandslideEwsApp({
+    super.key,
+    required this.appState,
+    required this.syncService,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: appState,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: appState),
+        ChangeNotifierProvider.value(value: syncService),
+        ChangeNotifierProvider(create: (_) => AuthProvider(AuthService())),
+      ],
       child: MaterialApp(
         title: 'NER Landslide EWS',
         debugShowCheckedModeBanner: false,

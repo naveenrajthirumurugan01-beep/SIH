@@ -1,64 +1,194 @@
+import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/app_config.dart';
 
-/// Wraps geolocator with a hard fallback to the study-area center, so
-/// callers never have to handle "no permission" / "GPS off" as a special
-/// case — they always get a usable LatLng.
+enum FieldGpsStatus {
+  disabled, // Location services disabled in device settings
+  permissionDenied, // Location permission denied by user
+  permissionDeniedForever, // Location permission permanently denied
+  acquiring, // Acquiring satellite fix
+  activeHighAccuracy, // Satellite fix acquired, accuracy <= 30m
+  activeLowAccuracy, // Satellite fix acquired, but poor accuracy > 30m
+  error, // System/Hardware error
+}
+
+class FieldGpsFix {
+  final double latitude;
+  final double longitude;
+  final double accuracyMeters;
+  final DateTime timestamp;
+  final FieldGpsStatus status;
+  final String? errorMessage;
+
+  const FieldGpsFix({
+    required this.latitude,
+    required this.longitude,
+    required this.accuracyMeters,
+    required this.timestamp,
+    required this.status,
+    this.errorMessage,
+  });
+
+  /// Accuracy threshold <= 30m is required for reliable field inspection
+  bool get isReliable =>
+      status == FieldGpsStatus.activeHighAccuracy && accuracyMeters <= 30.0;
+
+  String get accuracyLabel =>
+      accuracyMeters <= 0 ? 'Unknown' : '±${accuracyMeters.toStringAsFixed(1)} m';
+}
+
+/// Wraps Geolocator to handle GPS permissions, location availability,
+/// accuracy evaluation, and recovery actions for Field Officer inspections.
 class LocationService {
   static const LatLng studyAreaCenter = LatLng(
     AppConfig.studyAreaCenterLat,
     AppConfig.studyAreaCenterLng,
   );
 
-  Future<LatLng> getCurrentOrFallback() async {
-    try {
-      if (!await _hasPermission()) return studyAreaCenter;
-      if (!await Geolocator.isLocationServiceEnabled()) return studyAreaCenter;
+  /// Constant for accuracy classification
+  static const double HighAccuracyThresholdMeters = 30.0;
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
-        ),
+  Future<FieldGpsFix> getFieldGpsFix() async {
+    // 1. Check if device location services are enabled
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      return FieldGpsFix(
+        latitude: studyAreaCenter.latitude,
+        longitude: studyAreaCenter.longitude,
+        accuracyMeters: 0,
+        timestamp: DateTime.now(),
+        status: FieldGpsStatus.disabled,
+        errorMessage: 'Device GPS / Location Services are turned off.',
       );
-      return LatLng(position.latitude, position.longitude);
-    } catch (_) {
-      // Any platform/permission/timeout error: fall back rather than crash.
-      return studyAreaCenter;
     }
-  }
 
-  Future<bool> _hasPermission() async {
+    // 2. Check & Request Permissions
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return FieldGpsFix(
+          latitude: studyAreaCenter.latitude,
+          longitude: studyAreaCenter.longitude,
+          accuracyMeters: 0,
+          timestamp: DateTime.now(),
+          status: FieldGpsStatus.permissionDenied,
+          errorMessage: 'Location permission was denied by user.',
+        );
+      }
     }
-    return permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse;
+
+    if (permission == LocationPermission.deniedForever) {
+      return FieldGpsFix(
+        latitude: studyAreaCenter.latitude,
+        longitude: studyAreaCenter.longitude,
+        accuracyMeters: 0,
+        timestamp: DateTime.now(),
+        status: FieldGpsStatus.permissionDeniedForever,
+        errorMessage: 'Location permission is permanently denied in device settings.',
+      );
+    }
+
+    // 3. Retrieve position with accuracy & timestamp
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      final status = position.accuracy <= HighAccuracyThresholdMeters
+          ? FieldGpsStatus.activeHighAccuracy
+          : FieldGpsStatus.activeLowAccuracy;
+
+      return FieldGpsFix(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracyMeters: position.accuracy,
+        timestamp: position.timestamp ?? DateTime.now(),
+        status: status,
+        errorMessage: status == FieldGpsStatus.activeLowAccuracy
+            ? 'Weak GPS accuracy (${position.accuracy.toStringAsFixed(1)}m). Open sky view required.'
+            : null,
+      );
+    } catch (e) {
+      return FieldGpsFix(
+        latitude: studyAreaCenter.latitude,
+        longitude: studyAreaCenter.longitude,
+        accuracyMeters: 0,
+        timestamp: DateTime.now(),
+        status: FieldGpsStatus.error,
+        errorMessage: 'Failed to acquire GPS fix: ${e.toString()}',
+      );
+    }
   }
 
-  /// Live position updates for the Field Officer geofence check. Emits
-  /// nothing if permission is denied/GPS is off — callers should pair this
-  /// with an initial [getCurrentOrFallback] call to still show something.
-  Stream<LatLng> watchPosition({int distanceFilterMeters = 5}) {
-    return watchPositionRaw(distanceFilterMeters: distanceFilterMeters)
-        .map((position) => LatLng(position.latitude, position.longitude));
-  }
+  /// Live Stream of GPS position fixes for active Field Officer inspection
+  Stream<FieldGpsFix> watchFieldGpsFix() async* {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      yield FieldGpsFix(
+        latitude: studyAreaCenter.latitude,
+        longitude: studyAreaCenter.longitude,
+        accuracyMeters: 0,
+        timestamp: DateTime.now(),
+        status: FieldGpsStatus.disabled,
+        errorMessage: 'Device GPS / Location Services are turned off.',
+      );
+      return;
+    }
 
-  /// Same as [watchPosition] but yields the raw [Position], for callers
-  /// that need `accuracy` too (e.g. the geofence check's "GPS accuracy
-  /// low" warning) rather than just a lat/lng.
-  Stream<Position> watchPositionRaw({int distanceFilterMeters = 5}) async* {
-    if (!await _hasPermission()) return;
-    if (!await Geolocator.isLocationServiceEnabled()) return;
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      yield FieldGpsFix(
+        latitude: studyAreaCenter.latitude,
+        longitude: studyAreaCenter.longitude,
+        accuracyMeters: 0,
+        timestamp: DateTime.now(),
+        status: permission == LocationPermission.deniedForever
+            ? FieldGpsStatus.permissionDeniedForever
+            : FieldGpsStatus.permissionDenied,
+        errorMessage: 'Location permission required.',
+      );
+      return;
+    }
 
     yield* Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
+      locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: distanceFilterMeters,
+        distanceFilter: 3,
       ),
-    );
+    ).map((position) {
+      final status = position.accuracy <= HighAccuracyThresholdMeters
+          ? FieldGpsStatus.activeHighAccuracy
+          : FieldGpsStatus.activeLowAccuracy;
+
+      return FieldGpsFix(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracyMeters: position.accuracy,
+        timestamp: position.timestamp ?? DateTime.now(),
+        status: status,
+        errorMessage: status == FieldGpsStatus.activeLowAccuracy
+            ? 'Weak GPS accuracy (${position.accuracy.toStringAsFixed(1)}m). Open sky view required.'
+            : null,
+      );
+    });
+  }
+
+  // Recovery Actions
+  Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
+  Future<bool> openAppSettings() => Geolocator.openAppSettings();
+  Future<LocationPermission> requestPermission() => Geolocator.requestPermission();
+
+  Future<LatLng> getCurrentOrFallback() async {
+    final fix = await getFieldGpsFix();
+    return LatLng(fix.latitude, fix.longitude);
+  }
+
+  Stream<LatLng> watchPosition({int distanceFilterMeters = 5}) async* {
+    yield* watchFieldGpsFix().map((fix) => LatLng(fix.latitude, fix.longitude));
   }
 }

@@ -36,8 +36,26 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> signIn(String email, String password) =>
-      _authService.signIn(email: email, password: password);
+  Future<void> signIn(String email, String password) async {
+    final fetchedProfile = await _authService.signInAndFetchProfile(
+      email: email,
+      password: password,
+    );
+    profile = fetchedProfile;
+    status = AuthStatus.signedIn;
+    notifyListeners();
+  }
+
+  Future<UserProfile> signInFieldOfficer(String email, String password) async {
+    final verifiedProfile = await _authService.authenticateFieldOfficer(
+      email: email,
+      password: password,
+    );
+    profile = verifiedProfile;
+    status = AuthStatus.signedIn;
+    notifyListeners();
+    return verifiedProfile;
+  }
 
   Future<void> signUp({
     required String email,
@@ -46,6 +64,7 @@ class AuthProvider extends ChangeNotifier {
     required String phoneNumber,
     required String district,
     required UserRole role,
+    String? officerId,
   }) =>
       _authService.signUp(
         email: email,
@@ -54,7 +73,13 @@ class AuthProvider extends ChangeNotifier {
         phoneNumber: phoneNumber,
         district: district,
         role: role,
+        officerId: officerId,
       );
 
-  Future<void> signOut() => _authService.signOut();
+  Future<void> signOut() async {
+    await _authService.signOut();
+    profile = null;
+    status = AuthStatus.signedOut;
+    notifyListeners();
+  }
 }

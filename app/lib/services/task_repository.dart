@@ -123,7 +123,9 @@ class MockTaskRepository implements TaskRepository {
   }
 
   List<InspectionTask> _filtered(String officerUid) {
-    final mine = _tasks.where((t) => t.assignedOfficerUid == officerUid).toList()
+    final mine = _tasks
+        .where((t) => t.assignedOfficerUid == officerUid || t.assignedOfficerUid == demoOfficerUid)
+        .toList()
       ..sort(_riskThenRecency);
     return mine;
   }

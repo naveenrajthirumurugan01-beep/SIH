@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -212,10 +211,10 @@ class FirestoreInspectionRepository implements InspectionRepository {
   }
 
   Future<String> _uploadPhoto(String officerUid, String localPath) async {
-    final fileName =
-        '${DateTime.now().microsecondsSinceEpoch}_${localPath.split(Platform.pathSeparator).last}';
+    final cleanName = localPath.split('/').last.split(r'\').last;
+    final fileName = '${DateTime.now().microsecondsSinceEpoch}_$cleanName';
     final ref = FirebaseStorage.instance.ref('field_inspection_media/$officerUid/$fileName');
-    await ref.putFile(File(localPath));
+    await ref.putString(localPath);
     return ref.getDownloadURL();
   }
 }
