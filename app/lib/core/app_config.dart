@@ -32,6 +32,12 @@ class AppConfig {
   static const String district = 'Dibang Valley';
   static const String stateName = 'Arunachal Pradesh';
 
+  // Mathunli reference village for demo GPS fallback (used by the Citizen
+  // report/location flows when a real GPS fix isn't available).
+  static const double fallbackLat = 28.7156;
+  static const double fallbackLng = 95.6332;
+  static const String fallbackVillageName = 'Near Mathunli Village';
+
   static bool containsPoint(double lat, double lng) {
     return lat >= studyAreaMinLat &&
         lat <= studyAreaMaxLat &&

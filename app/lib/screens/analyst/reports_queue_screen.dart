@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -343,8 +344,14 @@ class _Thumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = path.startsWith('http')
-        ? Image.network(path, width: 56, height: 56, fit: BoxFit.cover)
+    final image = path.startsWith('http') || kIsWeb
+        ? Image.network(
+            path,
+            width: 56,
+            height: 56,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => const Icon(Icons.image, size: 32),
+          )
         : Image.file(File(path), width: 56, height: 56, fit: BoxFit.cover);
 
     return ClipRRect(

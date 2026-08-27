@@ -105,6 +105,17 @@ class InspectionTask {
   final double lat;
   final double lng;
   final RiskLevel riskLevel;
+
+  /// Which risk zone this task is associated with, if any. Free-form
+  /// descriptive fields — not yet looked up from RiskRepository — used by
+  /// task-list display; both default to a placeholder rather than null so
+  /// existing UI doesn't need extra null-handling.
+  final String riskZoneId;
+  final String locationName;
+
+  /// Free-text severity label shown alongside [riskLevel] in task lists.
+  final String priority;
+
   final String reason;
   final String instructions;
   final InspectionTaskStatus status;
@@ -155,6 +166,9 @@ class InspectionTask {
     this.assignedAt,
     this.dueDate,
     this.acceptedAt,
+    this.riskZoneId = '',
+    this.locationName = '',
+    this.priority = '',
   });
 
   InspectionTask copyWith({
@@ -165,6 +179,9 @@ class InspectionTask {
     DateTime? assignedAt,
     DateTime? dueDate,
     DateTime? acceptedAt,
+    String? riskZoneId,
+    String? locationName,
+    String? priority,
   }) {
     return InspectionTask(
       id: id,
@@ -184,6 +201,9 @@ class InspectionTask {
       assignedAt: assignedAt ?? this.assignedAt,
       dueDate: dueDate ?? this.dueDate,
       acceptedAt: acceptedAt ?? this.acceptedAt,
+      riskZoneId: riskZoneId ?? this.riskZoneId,
+      locationName: locationName ?? this.locationName,
+      priority: priority ?? this.priority,
     );
   }
 
@@ -195,6 +215,9 @@ class InspectionTask {
       lat: (data['lat'] as num?)?.toDouble() ?? 0,
       lng: (data['lng'] as num?)?.toDouble() ?? 0,
       riskLevel: RiskLevelX.fromFirestoreValue(data['risk_level'] as String? ?? 'low'),
+      riskZoneId: data['risk_zone_id'] as String? ?? '',
+      locationName: data['location_name'] as String? ?? '',
+      priority: data['priority'] as String? ?? '',
       reason: data['reason'] as String? ?? '',
       instructions: data['instructions'] as String? ?? '',
       status: InspectionTaskStatusX.fromFirestoreValue(data['status'] as String? ?? 'assigned'),
@@ -219,6 +242,9 @@ class InspectionTask {
         'lat': lat,
         'lng': lng,
         'risk_level': riskLevel.firestoreValue,
+        'risk_zone_id': riskZoneId,
+        'location_name': locationName,
+        'priority': priority,
         'reason': reason,
         'instructions': instructions,
         'status': status.firestoreValue,

@@ -1,3 +1,5 @@
+import 'package:latlong2/latlong.dart';
+
 /// Citizen-facing risk classification. Deliberately just four plain-language
 /// bands (no raw ML scores/jargon surfaced to citizens) — see
 /// core/theme.dart for the color mapping used throughout the Citizen UI.
@@ -83,6 +85,11 @@ class RiskZone {
   /// Lineament (fracture/fault line) density in [0, 1] — demo-derived.
   final double lineamentDensity;
 
+  /// Optional polygon boundary for a future map heatmap overlay. Not yet
+  /// populated from Firestore by any repository — always empty until a
+  /// real polygon source exists.
+  final List<LatLng> polygonPoints;
+
   const RiskZone({
     required this.id,
     required this.name,
@@ -104,6 +111,7 @@ class RiskZone {
     this.lithology = 'Unknown',
     this.lulc = 'Unknown',
     this.lineamentDensity = 0,
+    this.polygonPoints = const [],
   });
 
   factory RiskZone.fromFirestore(String id, Map<String, dynamic> data) {

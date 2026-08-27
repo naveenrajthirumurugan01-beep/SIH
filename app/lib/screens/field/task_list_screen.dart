@@ -20,59 +20,47 @@ class TaskListScreen extends StatelessWidget {
     final appState = context.watch<AppState>();
     final user = appState.currentUser;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Field Officer Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () => appState.signOut(),
-          ),
-        ],
-      ),
-      body: StreamBuilder<List<InspectionTask>>(
-        stream: appState.taskRepository.watchTasksForOfficer(appState.uid),
-        builder: (context, snapshot) {
-          final tasks = snapshot.data;
-          final notifiedCount =
-              tasks?.where((t) => t.status == InspectionTaskStatus.notified).length ?? 0;
+    return StreamBuilder<List<InspectionTask>>(
+      stream: appState.taskRepository.watchTasksForOfficer(appState.uid),
+      builder: (context, snapshot) {
+        final tasks = snapshot.data;
+        final notifiedCount =
+            tasks?.where((t) => t.status == InspectionTaskStatus.notified).length ?? 0;
 
-          return ListView(
-            padding: ResponsivePadding.defaultPadding(context),
-            children: [
-              _DashboardHeader(user: user),
-              if (notifiedCount > 0) ...[
-                const SizedBox(height: 16),
-                _NotificationBanner(count: notifiedCount),
-              ],
-              const SizedBox(height: 24),
-              Text(
-                'Assigned Inspections',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 12),
-              if (tasks == null)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (tasks.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(
-                    child: Text(
-                      'No assignments yet',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
-              else
-                ...tasks.map((task) => _TaskCard(task: task)),
+        return ListView(
+          padding: ResponsivePadding.defaultPadding(context),
+          children: [
+            _DashboardHeader(user: user),
+            if (notifiedCount > 0) ...[
+              const SizedBox(height: 16),
+              _NotificationBanner(count: notifiedCount),
             ],
-          );
-        },
-      ),
+            const SizedBox(height: 24),
+            Text(
+              'Assigned Inspections',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            if (tasks == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (tasks.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    'No assignments yet',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            else
+              ...tasks.map((task) => _TaskCard(task: task)),
+          ],
+        );
+      },
     );
   }
 }

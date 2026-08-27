@@ -13,36 +13,33 @@ class MyInspectionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('My Inspections')),
-      body: StreamBuilder<List<FieldInspection>>(
-        stream: appState.inspectionRepository.watchMyInspections(appState.uid),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    return StreamBuilder<List<FieldInspection>>(
+      stream: appState.inspectionRepository.watchMyInspections(appState.uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          final inspections = snapshot.data!;
-          if (inspections.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: ResponsivePadding.defaultPadding(context),
-                child: const Text(
-                  'No inspections submitted yet.',
-                  textAlign: TextAlign.center,
-                ),
+        final inspections = snapshot.data!;
+        if (inspections.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: ResponsivePadding.defaultPadding(context),
+              child: const Text(
+                'No inspections submitted yet.',
+                textAlign: TextAlign.center,
               ),
-            );
-          }
-
-          return ListView.builder(
-            padding: ResponsivePadding.defaultPadding(context),
-            itemCount: inspections.length,
-            itemBuilder: (context, index) =>
-                _InspectionCard(inspection: inspections[index]),
+            ),
           );
-        },
-      ),
+        }
+
+        return ListView.builder(
+          padding: ResponsivePadding.defaultPadding(context),
+          itemCount: inspections.length,
+          itemBuilder: (context, index) =>
+              _InspectionCard(inspection: inspections[index]),
+        );
+      },
     );
   }
 }
