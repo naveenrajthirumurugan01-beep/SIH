@@ -1,0 +1,66 @@
+
+--------------------------------------------------
+DIGITAL TWIN SIMULATION RESULT
+--------------------------------------------------
+
+Source Incident:
+DV-007 (Dri River Slope - Anini Highway Section)
+
+Current Risk:
+0.82 — CRITICAL
+
+Simulation Horizon:
+6 HOURS (Scenario: RAINFALL_PLUS_50)
+
+--------------------------------------------------
+NEXT EMERGENT RISK
+--------------------------------------------------
+
+Zone:
+DV-011 (Dri River Bridge Support Slope)
+
+Current Risk:
+0.8 — CRITICAL
+
+Predicted Risk:
+0.88 — CRITICAL
+
+Risk Increase:
++0.08
+
+Distance from Incident:
+1.25 km
+
+Prediction Horizon:
+3–6 hours
+
+--------------------------------------------------
+WHY WAS THIS ZONE SELECTED? (TRACEABILITY)
+--------------------------------------------------
+
+1. Pore pressure increased from 46.5 kPa to 46.88 kPa under infiltrating rainfall.
+2. Effective stress reduced to 0.1 kPa, weakening Mohr-Coulomb shear strength.
+3. Displacement trend transitioned to RAPIDLY_ACCELERATING with acceleration 0.8 mm/h².
+4. Slope geometry (54.0°) and high antecedence preconditioned terrain stability degradation.
+5. Candidate exhibited highest emerging risk growth (+0.08) across 5.0 km spatial search radius.
+
+--------------------------------------------------
+PHYSICAL CAUSALITY CHAIN
+--------------------------------------------------
+
+  [1] Source Incident Identified
+  [2] Spatial Candidate Area Created
+  [3] Rainfall Infiltration & Pore-Fluid Coupling
+  [4] Pore Pressure Buildup & Effective Stress Reduction
+  [5] Shear Strength Degradation & Kinematic Acceleration
+  [6] Risk Evolution & Timestep Integration
+  [7] Emerging Risk Ranking
+  [8] Selected Next Emergent Risk: DV-011
+
+--------------------------------------------------
+Simulation Status:
+PROTOTYPE_SIMULATION
+
+Validation Status:
+NOT_YET_VALIDATED_WITH_LOCAL_FIELD_OBSERVATIONS
+--------------------------------------------------
