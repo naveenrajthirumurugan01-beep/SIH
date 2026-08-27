@@ -1,11 +1,12 @@
-import 'dart:math';
+import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/user_role.dart';
+import '../models/app_user.dart';
 import '../services/alert_repository.dart';
+import '../services/auth_repository.dart';
 import '../services/inspection_repository.dart';
 import '../services/location_service.dart';
 import '../services/report_repository.dart';
@@ -13,70 +14,70 @@ import '../services/risk_repository.dart';
 import '../services/task_repository.dart';
 import 'app_config.dart';
 
-const _deviceIdPrefsKey = 'device_id';
-const _rolePrefsKey = 'current_role';
-const _officerNamePrefsKey = 'officer_name';
-const _officerIdPrefsKey = 'officer_id';
-
 /// App-wide DI container + light UI state. Builds the mock or Firestore
-/// repository implementations based on [AppConfig.useMockData], hands out
-/// a stable per-device anonymous id (persisted via shared_preferences) so
-/// "My Reports" works without a real Firebase Auth user, and — for the
-/// Field Officer build — a lightweight officer identity persisted the same
-/// stopgap way (see screens/role_entry_screen.dart, which is explicitly a
-/// placeholder for real login).
+/// repository implementations based on [AppConfig.useMockData], and
+/// relays the signed-in [AppUser] (or null) from AuthRepository so
+/// main.dart's router and every screen can read the current user's role
+/// and approval state from one place.
 class AppState extends ChangeNotifier {
   AppState._({
-    required this.deviceId,
+    required this.authRepository,
     required this.riskRepository,
     required this.reportRepository,
     required this.alertRepository,
     required this.taskRepository,
     required this.inspectionRepository,
-    required this._prefs,
-    UserRole? currentRole,
-    String? officerName,
-    String? officerId,
   }) {
-    _currentRole = currentRole;
-    _officerName = officerName;
-    _officerId = officerId;
+    _authSubscription = authRepository.currentAppUser.listen(
+      (user) {
+        _currentUser = user;
+        _authResolved = true;
+        notifyListeners();
+      },
+      // A background auth error (e.g. a stale/stuck identitytoolkit
+      // token-refresh attempt against cached Firebase Auth state) must
+      // never surface as a crash or a stuck UI. Treat it exactly like
+      // "signed out" — the router falls back to RoleSelectScreen/sign-in,
+      // which is always a safe, recoverable state to land in; the
+      // subscription itself keeps listening, so a subsequent valid auth
+      // state still comes through normally.
+      onError: (Object error, StackTrace stackTrace) {
+        _currentUser = null;
+        _authResolved = true;
+        notifyListeners();
+      },
+    );
   }
 
-  final String deviceId;
+  final AuthRepository authRepository;
   final RiskRepository riskRepository;
   final ReportRepository reportRepository;
   final AlertRepository alertRepository;
   final TaskRepository taskRepository;
   final InspectionRepository inspectionRepository;
 
-  final SharedPreferences _prefs;
+  late final StreamSubscription<AppUser?> _authSubscription;
+
+  AppUser? _currentUser;
+  AppUser? get currentUser => _currentUser;
+
+  /// True once the auth stream has emitted at least once, so main.dart's
+  /// router can show a brief loading state instead of flashing the sign-in
+  /// screen for an already-signed-in user while the first snapshot loads.
+  bool _authResolved = false;
+  bool get authResolved => _authResolved;
+
+  /// Only valid while signed in (every screen that reads this is reached
+  /// through main.dart's auth-gated router).
+  String get uid => fb_auth.FirebaseAuth.instance.currentUser!.uid;
+
   final LocationService _locationService = LocationService();
-
-  UserRole? _currentRole;
-  UserRole? get currentRole => _currentRole;
-
-  String? _officerName;
-  String? get officerName => _officerName;
-
-  String? _officerId;
-  String? get officerId => _officerId;
 
   LatLng? _currentLocation;
   LatLng get currentLocation => _currentLocation ?? LocationService.studyAreaCenter;
   bool get hasResolvedLocation => _currentLocation != null;
 
   static Future<AppState> create() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    var deviceId = prefs.getString(_deviceIdPrefsKey);
-    if (deviceId == null) {
-      deviceId = _generateDeviceId();
-      await prefs.setString(_deviceIdPrefsKey, deviceId);
-    }
-
-    final roleValue = prefs.getString(_rolePrefsKey);
-
     final RiskRepository riskRepository =
         AppConfig.useMockData ? MockRiskRepository() : FirestoreRiskRepository();
     final ReportRepository reportRepository =
@@ -96,48 +97,14 @@ class AppState extends ChangeNotifier {
             taskRepository: taskRepository,
           );
 
-    if (reportRepository is MockReportRepository) {
-      reportRepository.seedDemoDataIfNeeded(deviceId);
-    }
-
     return AppState._(
-      deviceId: deviceId,
+      authRepository: AuthRepository(),
       riskRepository: riskRepository,
       reportRepository: reportRepository,
       alertRepository: alertRepository,
       taskRepository: taskRepository,
       inspectionRepository: inspectionRepository,
-      prefs: prefs,
-      currentRole: roleValue == null ? null : UserRoleX.fromFirestoreValue(roleValue),
-      officerName: prefs.getString(_officerNamePrefsKey),
-      officerId: prefs.getString(_officerIdPrefsKey),
     );
-  }
-
-  /// Set by the role-entry screen (screens/role_entry_screen.dart) — a
-  /// stand-in for real login until Firebase Auth exists. [officerName]/
-  /// [officerId] are required when [role] is fieldOfficial.
-  Future<void> setRole(UserRole role, {String? officerName, String? officerId}) async {
-    _currentRole = role;
-    await _prefs.setString(_rolePrefsKey, role.firestoreValue);
-
-    if (role == UserRole.fieldOfficial) {
-      _officerName = officerName;
-      _officerId = officerId;
-      if (officerName != null) await _prefs.setString(_officerNamePrefsKey, officerName);
-      if (officerId != null) await _prefs.setString(_officerIdPrefsKey, officerId);
-    }
-
-    notifyListeners();
-  }
-
-  /// Bounces back to the role-entry screen. Reachable via a small "switch
-  /// role" action in each shell — see citizen home / field task list
-  /// app bars — since there's no real sign-out flow yet.
-  Future<void> clearRole() async {
-    _currentRole = null;
-    await _prefs.remove(_rolePrefsKey);
-    notifyListeners();
   }
 
   Future<void> refreshLocation() async {
@@ -145,10 +112,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  static String _generateDeviceId() {
-    final random = Random();
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    final suffix = List.generate(8, (_) => random.nextInt(16).toRadixString(16)).join();
-    return 'device_${timestamp}_$suffix';
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
   }
 }

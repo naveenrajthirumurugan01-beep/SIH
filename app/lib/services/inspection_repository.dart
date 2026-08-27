@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../core/geo_utils.dart';
 import '../models/inspection.dart';
 import '../models/report.dart';
 import '../models/task.dart';
@@ -20,6 +21,8 @@ abstract class InspectionRepository {
     required double checkInLat,
     required double checkInLng,
     required DateTime checkInAt,
+    required double submissionLat,
+    required double submissionLng,
     required CrackStatus crackStatus,
     required SlopeMovement slopeMovement,
     required bool rockfall,
@@ -67,6 +70,8 @@ class MockInspectionRepository implements InspectionRepository {
     required double checkInLat,
     required double checkInLng,
     required DateTime checkInAt,
+    required double submissionLat,
+    required double submissionLng,
     required CrackStatus crackStatus,
     required SlopeMovement slopeMovement,
     required bool rockfall,
@@ -94,6 +99,9 @@ class MockInspectionRepository implements InspectionRepository {
       notes: notes,
       photoUrls: localPhotoPaths,
       submittedAt: DateTime.now(),
+      submissionLat: submissionLat,
+      submissionLng: submissionLng,
+      locationVerifiedAtSubmission: isInsideGeofence(submissionLat, submissionLng, task.geofence),
     );
 
     _inspections.add(inspection);
@@ -105,7 +113,7 @@ class MockInspectionRepository implements InspectionRepository {
   }
 
   Future<void> _closeLoop(InspectionTask task, FieldInspection inspection) async {
-    await taskRepository.updateTaskStatus(task.id, InspectionTaskStatus.completed);
+    await taskRepository.completeTask(task.id);
 
     final linkedReportId = task.linkedReportId;
     if (linkedReportId == null) return;
@@ -147,6 +155,8 @@ class FirestoreInspectionRepository implements InspectionRepository {
     required double checkInLat,
     required double checkInLng,
     required DateTime checkInAt,
+    required double submissionLat,
+    required double submissionLng,
     required CrackStatus crackStatus,
     required SlopeMovement slopeMovement,
     required bool rockfall,
@@ -176,6 +186,9 @@ class FirestoreInspectionRepository implements InspectionRepository {
       notes: notes,
       photoUrls: photoUrls,
       submittedAt: DateTime.now(),
+      submissionLat: submissionLat,
+      submissionLng: submissionLng,
+      locationVerifiedAtSubmission: isInsideGeofence(submissionLat, submissionLng, task.geofence),
     );
 
     final docRef = await _firestore.collection(_collection).add(inspection.toFirestore());
@@ -187,7 +200,7 @@ class FirestoreInspectionRepository implements InspectionRepository {
   }
 
   Future<void> _closeLoop(InspectionTask task, FieldInspection inspection) async {
-    await taskRepository.updateTaskStatus(task.id, InspectionTaskStatus.completed);
+    await taskRepository.completeTask(task.id);
 
     final linkedReportId = task.linkedReportId;
     if (linkedReportId == null) return;

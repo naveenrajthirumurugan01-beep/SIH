@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/geofence_utils.dart';
+import '../../models/app_user.dart';
+import '../../models/geofence.dart';
 import '../../models/report.dart';
 import '../../models/risk_zone.dart';
 import '../../models/task.dart';
 import '../../models/user_role.dart';
-import '../../services/task_repository.dart';
 import '../../widgets/hazard_icons.dart';
 
 const _activeStatuses = {ReportStatus.submitted, ReportStatus.underReview};
@@ -65,71 +67,57 @@ class _ActiveReportCard extends StatelessWidget {
 
   Future<void> _assign(BuildContext context) async {
     final appState = context.read<AppState>();
-    final nameController = TextEditingController();
-    final idController = TextEditingController(text: demoOfficerUid);
+    final officers = await appState.authRepository.watchEnabledFieldOfficers().first;
+    if (!context.mounted) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Assign Field Officer'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Officer Name'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: idController,
-              decoration: const InputDecoration(
-                labelText: 'Officer ID',
-                helperText: 'Keep "demo_officer" to route to the demo Field Officer',
-              ),
-            ),
-          ],
+    if (officers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No approved Field Officer accounts yet — approve one under Pending Accounts first.'),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Assign'),
-          ),
-        ],
-      ),
+      );
+      return;
+    }
+
+    final selected = await showDialog<AppUser>(
+      context: context,
+      builder: (dialogContext) => _AssignOfficerDialog(officers: officers),
     );
 
-    if (confirmed != true || !context.mounted) return;
-    if (idController.text.trim().isEmpty) return;
+    if (selected == null || !context.mounted) return;
 
     // Ties the new task's risk level to the model's own read of this
     // location, rather than guessing — same data the citizen map shows.
-    final nearestZone =
-        await appState.riskRepository.getNearestZone(report.lat, report.lng);
+    final nearestZone = await appState.riskRepository.getNearestZone(report.lat, report.lng);
+    final riskLevel = nearestZone?.level ?? RiskLevel.moderate;
 
     await appState.taskRepository.createTask(
       InspectionTask(
         id: '',
-        assignedOfficerUid: idController.text.trim(),
+        assignedOfficerUid: selected.uid,
         linkedReportId: report.id,
         lat: report.lat,
         lng: report.lng,
-        riskLevel: nearestZone?.level ?? RiskLevel.moderate,
+        riskLevel: riskLevel,
         reason: 'Citizen report: ${report.description}',
         instructions:
             'Field-verify the ${report.hazardType.label.toLowerCase()} reported at this '
             'location. Reporter notes: "${report.description}"',
         status: InspectionTaskStatus.assigned,
         createdAt: DateTime.now(),
+        geofence: Geofence.circle(
+          centerLat: report.lat,
+          centerLng: report.lng,
+          radiusMeters: radiusMetersForSeverity(riskLevel),
+        ),
+        assignmentType: AssignmentType.manual,
+        assignedBy: appState.uid,
       ),
     );
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Assigned to ${nameController.text.trim().isEmpty ? idController.text.trim() : nameController.text.trim()}.')),
+      SnackBar(content: Text('Assigned to ${selected.displayName ?? selected.email}.')),
     );
   }
 
@@ -230,6 +218,48 @@ class _ActiveReportCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AssignOfficerDialog extends StatefulWidget {
+  final List<AppUser> officers;
+
+  const _AssignOfficerDialog({required this.officers});
+
+  @override
+  State<_AssignOfficerDialog> createState() => _AssignOfficerDialogState();
+}
+
+class _AssignOfficerDialogState extends State<_AssignOfficerDialog> {
+  late AppUser _selected = widget.officers.first;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Assign Field Officer'),
+      content: DropdownButtonFormField<AppUser>(
+        initialValue: _selected,
+        decoration: const InputDecoration(labelText: 'Field Officer'),
+        items: [
+          for (final officer in widget.officers)
+            DropdownMenuItem(
+              value: officer,
+              child: Text(officer.displayName ?? officer.email),
+            ),
+        ],
+        onChanged: (officer) => setState(() => _selected = officer ?? _selected),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_selected),
+          child: const Text('Assign'),
+        ),
+      ],
     );
   }
 }

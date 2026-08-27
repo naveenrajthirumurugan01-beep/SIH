@@ -28,7 +28,10 @@ FEATURE_COLUMNS = [
 ]
 TARGET_COLUMN = "risk_label"  # 0=low, 1=medium, 2=high, 3=very_high
 
-MODEL_OUTPUT_PATH = "ml/models/risk_model.joblib"
+import os
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+MODEL_OUTPUT_PATH = os.path.join(BASE_DIR, "models", "risk_model.joblib")
 
 
 def _get_model():
