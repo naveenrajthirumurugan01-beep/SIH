@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_state.dart';
 import '../../models/inspection.dart';
 import '../../models/task.dart';
-import '../../services/task_repository.dart';
+import '../../services/location_service.dart';
 
 /// Structured inspection form — every field is a chip/switch selection,
 /// never free text, so findings stay machine-readable (they drive the
@@ -48,13 +48,21 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
     setState(() => _isSubmitting = true);
     try {
       final appState = context.read<AppState>();
+
+      // Captured now, separately from checkInLat/Lng (taken earlier at
+      // the geofence-check step) — the officer may have spent real time
+      // filling out this form in between.
+      final submissionPoint = await LocationService().getCurrentOrFallback();
+
       await appState.inspectionRepository.submitInspection(
         task: widget.task,
-        officerUid: appState.officerId ?? demoOfficerUid,
-        officerName: appState.officerName ?? 'Field Officer',
+        officerUid: appState.uid,
+        officerName: appState.currentUser?.displayName ?? appState.currentUser?.email ?? 'Field Officer',
         checkInLat: widget.checkInLat,
         checkInLng: widget.checkInLng,
         checkInAt: widget.checkInAt,
+        submissionLat: submissionPoint.latitude,
+        submissionLng: submissionPoint.longitude,
         crackStatus: _crackStatus,
         slopeMovement: _slopeMovement,
         rockfall: _rockfall,

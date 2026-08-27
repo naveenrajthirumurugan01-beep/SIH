@@ -17,7 +17,7 @@ class MyReportsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('My Reports')),
       body: StreamBuilder<List<Report>>(
-        stream: appState.reportRepository.watchMyReports(appState.deviceId),
+        stream: appState.reportRepository.watchMyReports(appState.uid),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());

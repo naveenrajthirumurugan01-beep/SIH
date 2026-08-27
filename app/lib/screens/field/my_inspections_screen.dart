@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
 import '../../models/inspection.dart';
-import '../../services/task_repository.dart';
 
 class MyInspectionsScreen extends StatelessWidget {
   const MyInspectionsScreen({super.key});
@@ -12,12 +11,11 @@ class MyInspectionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
-    final officerUid = appState.officerId ?? demoOfficerUid;
 
     return Scaffold(
       appBar: AppBar(title: const Text('My Inspections')),
       body: StreamBuilder<List<FieldInspection>>(
-        stream: appState.inspectionRepository.watchMyInspections(officerUid),
+        stream: appState.inspectionRepository.watchMyInspections(appState.uid),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());

@@ -1,0 +1,31 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "ner-landslide-ews",
+          "appId": "1:554006651001:android:beed66ec37f27367c934a8",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "ner-landslide-ews",
+          "configurations": {
+            "android": "1:554006651001:android:beed66ec37f27367c934a8",
+            "ios": "1:554006651001:ios:16c0d941d41bf888c934a8",
+            "macos": "1:554006651001:ios:16c0d941d41bf888c934a8",
+            "web": "1:554006651001:web:bb02b0fe042f691ec934a8",
+            "windows": "1:554006651001:web:99e0124d77d8c12ec934a8"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

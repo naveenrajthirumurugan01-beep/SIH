@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
 import '../../models/task.dart';
-import '../../services/task_repository.dart';
 import '../../widgets/risk_badge.dart';
 import '../../widgets/task_status_chip.dart';
 import 'task_detail_screen.dart';
@@ -14,21 +13,20 @@ class TaskListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
-    final officerUid = appState.officerId ?? demoOfficerUid;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Tasks'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.swap_horiz),
-            tooltip: 'Switch role',
-            onPressed: () => appState.clearRole(),
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sign out',
+            onPressed: () => appState.authRepository.signOut(),
           ),
         ],
       ),
       body: StreamBuilder<List<InspectionTask>>(
-        stream: appState.taskRepository.watchTasksForOfficer(officerUid),
+        stream: appState.taskRepository.watchTasksForOfficer(appState.uid),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());

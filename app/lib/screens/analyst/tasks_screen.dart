@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/geofence_utils.dart';
+import '../../models/app_user.dart';
+import '../../models/geofence.dart';
+import '../../models/inspection.dart';
 import '../../models/risk_zone.dart';
 import '../../models/task.dart';
-import '../../services/task_repository.dart';
 import '../../widgets/risk_badge.dart';
 import '../../widgets/task_status_chip.dart';
+
+/// Analyst can edit the suggested radius up to this cap (see
+/// core/geofence_utils.dart's radiusMetersForSeverity for the default
+/// per-severity lookup this pre-fills from).
+const _maxManualRadiusMeters = 20000.0;
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -21,11 +29,21 @@ class _TasksScreenState extends State<TasksScreen> {
   Future<void> _flagZone() async {
     final appState = context.read<AppState>();
     final zones = await appState.riskRepository.getRiskZones();
+    final officers = await appState.authRepository.watchEnabledFieldOfficers().first;
     if (!mounted) return;
+
+    if (officers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No approved Field Officer accounts yet — approve one under Pending Accounts first.'),
+        ),
+      );
+      return;
+    }
 
     final created = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => _FlagZoneDialog(zones: zones),
+      builder: (dialogContext) => _FlagZoneDialog(zones: zones, officers: officers),
     );
 
     if (created == true && mounted) {
@@ -121,7 +139,24 @@ class _TaskTile extends StatelessWidget {
             const SizedBox(height: 8),
             Text(task.reason, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
-            Text('Assigned to: ${task.assignedOfficerUid}'),
+            Text('Assigned to: ${task.assignedOfficerUid ?? 'Unassigned'}'),
+            Text(
+              task.assignmentType == AssignmentType.manual
+                  ? 'Manually assigned by: ${task.assignedBy ?? 'unknown'}'
+                  : 'Automatically assigned',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.outline),
+            ),
+            Text(
+              'Geofence: ${task.geofence.radiusMeters.toStringAsFixed(0)}m radius '
+              '(${task.geofenceStatus == GeofenceStatus.active ? 'active' : 'inactive'})',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.outline),
+            ),
             Text(
               'Lat ${task.lat.toStringAsFixed(4)}, Lng ${task.lng.toStringAsFixed(4)}',
               style: Theme.of(context)
@@ -137,6 +172,8 @@ class _TaskTile extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
+            if (task.status == InspectionTaskStatus.completed)
+              _InspectionVerificationBadge(task: task),
           ],
         ),
       ),
@@ -144,10 +181,75 @@ class _TaskTile extends StatelessWidget {
   }
 }
 
+/// Once a task is completed, look up its (single) submitted inspection and
+/// flag whether the officer's GPS at submission time actually fell inside
+/// the geofence — this is the client-side check from
+/// InspectionRepository.submitInspection, surfaced here for analyst review
+/// per the design's "review carefully if unverified" requirement.
+class _InspectionVerificationBadge extends StatelessWidget {
+  final InspectionTask task;
+
+  const _InspectionVerificationBadge({required this.task});
+
+  @override
+  Widget build(BuildContext context) {
+    final officerUid = task.assignedOfficerUid;
+    if (officerUid == null) return const SizedBox.shrink();
+
+    final appState = context.read<AppState>();
+    return StreamBuilder<List<FieldInspection>>(
+      stream: appState.inspectionRepository.watchMyInspections(officerUid),
+      builder: (context, snapshot) {
+        final inspections = snapshot.data ?? const <FieldInspection>[];
+        FieldInspection? match;
+        for (final inspection in inspections) {
+          if (inspection.taskId == task.id) {
+            match = inspection;
+            break;
+          }
+        }
+        if (match == null) return const SizedBox.shrink();
+
+        if (match.locationVerifiedAtSubmission) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('Location verified at submission', style: TextStyle(color: Color(0xFF2E7D32))),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.warning_amber, size: 16, color: Theme.of(context).colorScheme.error),
+                const SizedBox(width: 6),
+                const Flexible(
+                  child: Text(
+                    'Location not verified at submission — review carefully',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _FlagZoneDialog extends StatefulWidget {
   final List<RiskZone> zones;
+  final List<AppUser> officers;
 
-  const _FlagZoneDialog({required this.zones});
+  const _FlagZoneDialog({required this.zones, required this.officers});
 
   @override
   State<_FlagZoneDialog> createState() => _FlagZoneDialogState();
@@ -155,24 +257,45 @@ class _FlagZoneDialog extends StatefulWidget {
 
 class _FlagZoneDialogState extends State<_FlagZoneDialog> {
   RiskZone? _selectedZone;
-  final _idController = TextEditingController(text: demoOfficerUid);
-  final _nameController = TextEditingController();
+  late AppUser _selectedOfficer = widget.officers.first;
+  late final TextEditingController _radiusController;
 
   @override
   void initState() {
     super.initState();
     if (widget.zones.isNotEmpty) _selectedZone = widget.zones.first;
+    _radiusController = TextEditingController(
+      text: radiusMetersForSeverity(_selectedZone?.level ?? RiskLevel.low).toStringAsFixed(0),
+    );
+  }
+
+  @override
+  void dispose() {
+    _radiusController.dispose();
+    super.dispose();
+  }
+
+  void _onZoneChanged(RiskZone? zone) {
+    setState(() {
+      _selectedZone = zone;
+      // Re-suggest the radius for the newly picked zone's severity — the
+      // analyst can still edit it afterwards.
+      _radiusController.text = radiusMetersForSeverity(zone?.level ?? RiskLevel.low).toStringAsFixed(0);
+    });
   }
 
   Future<void> _submit() async {
     final zone = _selectedZone;
-    if (zone == null || _idController.text.trim().isEmpty) return;
+    if (zone == null) return;
+
+    final radiusMeters = double.tryParse(_radiusController.text);
+    if (radiusMeters == null || radiusMeters <= 0) return;
 
     final appState = context.read<AppState>();
     await appState.taskRepository.createTask(
       InspectionTask(
         id: '',
-        assignedOfficerUid: _idController.text.trim(),
+        assignedOfficerUid: _selectedOfficer.uid,
         lat: zone.lat,
         lng: zone.lng,
         riskLevel: zone.level,
@@ -182,6 +305,13 @@ class _FlagZoneDialogState extends State<_FlagZoneDialog> {
             'not from a citizen report — confirm current ground conditions.',
         status: InspectionTaskStatus.assigned,
         createdAt: DateTime.now(),
+        geofence: Geofence.circle(
+          centerLat: zone.lat,
+          centerLng: zone.lng,
+          radiusMeters: radiusMeters.clamp(1, _maxManualRadiusMeters),
+        ),
+        assignmentType: AssignmentType.manual,
+        assignedBy: appState.uid,
       ),
     );
 
@@ -190,34 +320,56 @@ class _FlagZoneDialogState extends State<_FlagZoneDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final zone = _selectedZone;
+
     return AlertDialog(
       title: const Text('Flag Zone for Inspection'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<RiskZone>(
-            initialValue: _selectedZone,
-            decoration: const InputDecoration(labelText: 'Risk zone'),
-            items: [
-              for (final zone in widget.zones)
-                DropdownMenuItem(value: zone, child: Text('${zone.name} (${zone.level.label})')),
-            ],
-            onChanged: (zone) => setState(() => _selectedZone = zone),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Officer Name'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _idController,
-            decoration: const InputDecoration(
-              labelText: 'Officer ID',
-              helperText: 'Keep "demo_officer" to route to the demo Field Officer',
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<RiskZone>(
+              initialValue: _selectedZone,
+              decoration: const InputDecoration(labelText: 'Risk zone'),
+              items: [
+                for (final z in widget.zones)
+                  DropdownMenuItem(value: z, child: Text('${z.name} (${z.level.label})')),
+              ],
+              onChanged: _onZoneChanged,
             ),
-          ),
-        ],
+            if (zone != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Center: ${zone.lat.toStringAsFixed(4)}, ${zone.lng.toStringAsFixed(4)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _radiusController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Geofence radius (m)',
+                helperText: 'Suggested from risk severity — editable up to '
+                    '${_maxManualRadiusMeters.toStringAsFixed(0)}m',
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<AppUser>(
+              initialValue: _selectedOfficer,
+              decoration: const InputDecoration(labelText: 'Field Officer'),
+              items: [
+                for (final officer in widget.officers)
+                  DropdownMenuItem(
+                    value: officer,
+                    child: Text(officer.displayName ?? officer.email),
+                  ),
+              ],
+              onChanged: (officer) => setState(() => _selectedOfficer = officer ?? _selectedOfficer),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(

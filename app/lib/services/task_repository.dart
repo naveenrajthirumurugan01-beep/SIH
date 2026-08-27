@@ -2,16 +2,30 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/geofence.dart';
 import '../models/report.dart';
 import '../models/risk_zone.dart';
 import '../models/task.dart';
 import 'report_repository.dart';
 
-/// No real assignment system yet (see role_entry_screen.dart) — every
-/// seeded mock task is assigned to this fixed officer id, and the role
-/// entry screen prefills the Officer ID field with it so the demo tasks
-/// show up without any extra setup.
-const demoOfficerUid = 'demo_officer';
+/// The real Firebase Auth uid for the field@gmail.com demo Field Officer
+/// account (see the bootstrap that created its users/{uid} doc). Auth is
+/// always real (AppState/AuthRepository don't check AppConfig.useMockData),
+/// so even MockTaskRepository's seed data has to target a real uid for
+/// tasks to show up when signed in as that account. Real assignment
+/// otherwise goes through actual Field Officer accounts — see
+/// AuthRepository.watchEnabledFieldOfficers and
+/// screens/analyst/reports_queue_screen.dart / tasks_screen.dart.
+const demoFieldOfficerUid = 'D37iiSHTW6YXreM1qfX9a3bq5XD3';
+
+/// Task statuses that count as "still open" for the purposes of the
+/// automatic-assignment fairness rule (see auto_assignment_service.dart) —
+/// deliberately excludes completed/cancelled/unassigned.
+const activeTaskStatuses = {
+  InspectionTaskStatus.assigned,
+  InspectionTaskStatus.enRoute,
+  InspectionTaskStatus.onSite,
+};
 
 abstract class TaskRepository {
   /// Live list of tasks assigned to [officerUid], highest risk then
@@ -23,6 +37,16 @@ abstract class TaskRepository {
   Stream<List<InspectionTask>> watchAllTasks();
 
   Future<void> updateTaskStatus(String taskId, InspectionTaskStatus status);
+
+  /// Marks a task completed AND its geofence inactive in one update — this
+  /// is the combined transition that happens when an inspection is
+  /// submitted (see InspectionRepository.submitInspection). The geofence
+  /// data itself is kept, not deleted, for audit/review.
+  Future<void> completeTask(String taskId);
+
+  /// Count of [activeTaskStatuses] tasks currently assigned to [officerUid]
+  /// — the fairness signal automatic assignment picks the minimum of.
+  Future<int> countActiveTasksForOfficer(String officerUid);
 
   /// Creates a task (pass `id: ''`; a real id is assigned and returned).
   /// When [InspectionTask.linkedReportId] is set, this also pushes that
@@ -44,7 +68,7 @@ class MockTaskRepository implements TaskRepository {
   final List<InspectionTask> _tasks = [
     InspectionTask(
       id: 'task_1',
-      assignedOfficerUid: demoOfficerUid,
+      assignedOfficerUid: demoFieldOfficerUid,
       linkedReportId: MockReportRepository.demoSeedReportId,
       lat: MockReportRepository.demoSeedReportLat,
       lng: MockReportRepository.demoSeedReportLng,
@@ -57,10 +81,17 @@ class MockTaskRepository implements TaskRepository {
           'with a size reference.',
       status: InspectionTaskStatus.assigned,
       createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+      geofence: Geofence.circle(
+        centerLat: MockReportRepository.demoSeedReportLat,
+        centerLng: MockReportRepository.demoSeedReportLng,
+        radiusMeters: 5000, // high severity
+      ),
+      assignmentType: AssignmentType.manual,
+      assignedBy: 'demo_analyst',
     ),
     InspectionTask(
       id: 'task_2',
-      assignedOfficerUid: demoOfficerUid,
+      assignedOfficerUid: demoFieldOfficerUid,
       lat: 28.7891,
       lng: 95.8328,
       riskLevel: RiskLevel.critical,
@@ -72,6 +103,13 @@ class MockTaskRepository implements TaskRepository {
           'water saturation supports that.',
       status: InspectionTaskStatus.assigned,
       createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+      geofence: const Geofence(
+        type: GeofenceType.circle,
+        centerLat: 28.7891,
+        centerLng: 95.8328,
+        radiusMeters: 8000, // critical severity
+      ),
+      assignmentType: AssignmentType.automatic,
     ),
   ];
 
@@ -117,6 +155,25 @@ class MockTaskRepository implements TaskRepository {
     if (index == -1) return;
     _tasks[index] = _tasks[index].copyWith(status: status);
     _changes.add(null);
+  }
+
+  @override
+  Future<void> completeTask(String taskId) async {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index == -1) return;
+    _tasks[index] = _tasks[index].copyWith(
+      status: InspectionTaskStatus.completed,
+      geofenceStatus: GeofenceStatus.inactive,
+    );
+    _changes.add(null);
+  }
+
+  @override
+  Future<int> countActiveTasksForOfficer(String officerUid) async {
+    return _tasks
+        .where((t) =>
+            t.assignedOfficerUid == officerUid && activeTaskStatuses.contains(t.status))
+        .length;
   }
 
   @override
@@ -186,6 +243,28 @@ class FirestoreTaskRepository implements TaskRepository {
   }
 
   @override
+  Future<void> completeTask(String taskId) {
+    return _firestore.collection(_collection).doc(taskId).update({
+      'status': InspectionTaskStatus.completed.firestoreValue,
+      'geofence_status': GeofenceStatus.inactive.firestoreValue,
+    });
+  }
+
+  @override
+  Future<int> countActiveTasksForOfficer(String officerUid) async {
+    final snapshot = await _firestore
+        .collection(_collection)
+        .where('assigned_officer_uid', isEqualTo: officerUid)
+        .where(
+          'status',
+          whereIn: activeTaskStatuses.map((s) => s.firestoreValue).toList(),
+        )
+        .count()
+        .get();
+    return snapshot.count ?? 0;
+  }
+
+  @override
   Future<InspectionTask> createTask(InspectionTask task) async {
     final docRef = await _firestore.collection(_collection).add(task.toFirestore());
     final saved = task._withId(docRef.id);
@@ -211,5 +290,9 @@ extension _TaskWithId on InspectionTask {
         instructions: instructions,
         status: status,
         createdAt: createdAt,
+        geofence: geofence,
+        assignmentType: assignmentType,
+        assignedBy: assignedBy,
+        geofenceStatus: geofenceStatus,
       );
 }

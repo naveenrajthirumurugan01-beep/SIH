@@ -86,6 +86,21 @@ class FieldInspection {
   final List<String> photoUrls;
   final DateTime submittedAt;
 
+  /// GPS captured at actual submission time — distinct from [checkInLat]/
+  /// [checkInLng], which are captured earlier at the geofence-check step.
+  /// An officer can spend real time filling out the form in between, so
+  /// these two fixes can legitimately differ.
+  final double submissionLat;
+  final double submissionLng;
+
+  /// Client-side re-check of [submissionLat]/[submissionLng] against the
+  /// task's geofence at submission time (see core/geo_utils.dart's
+  /// isInsideGeofence). This is NOT tamper-proof — a modified client could
+  /// report anything. Real enforcement needs a server-side Cloud Function
+  /// re-check against trusted location data; that's future work, not part
+  /// of this pass. Surfaced to analysts as a review flag, not a hard block.
+  final bool locationVerifiedAtSubmission;
+
   const FieldInspection({
     required this.id,
     required this.taskId,
@@ -103,6 +118,9 @@ class FieldInspection {
     required this.notes,
     required this.photoUrls,
     required this.submittedAt,
+    required this.submissionLat,
+    required this.submissionLng,
+    required this.locationVerifiedAtSubmission,
   });
 
   /// Whether the officer's findings confirm an active hazard. Anything
@@ -136,6 +154,9 @@ class FieldInspection {
       notes: data['notes'] as String? ?? '',
       photoUrls: List<String>.from(data['photo_urls'] as List? ?? []),
       submittedAt: DateTime.tryParse(data['submitted_at'] as String? ?? '') ?? DateTime.now(),
+      submissionLat: (data['submission_lat'] as num?)?.toDouble() ?? 0,
+      submissionLng: (data['submission_lng'] as num?)?.toDouble() ?? 0,
+      locationVerifiedAtSubmission: data['location_verified_at_submission'] as bool? ?? false,
     );
   }
 
@@ -155,5 +176,8 @@ class FieldInspection {
         'notes': notes,
         'photo_urls': photoUrls,
         'submitted_at': submittedAt.toIso8601String(),
+        'submission_lat': submissionLat,
+        'submission_lng': submissionLng,
+        'location_verified_at_submission': locationVerifiedAtSubmission,
       };
 }

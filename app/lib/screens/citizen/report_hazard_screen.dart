@@ -55,7 +55,7 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
     try {
       final appState = context.read<AppState>();
       await appState.reportRepository.submitReport(
-        deviceId: appState.deviceId,
+        uid: appState.uid,
         role: UserRole.citizen,
         hazardType: _hazardType,
         description: _descriptionController.text.trim(),
