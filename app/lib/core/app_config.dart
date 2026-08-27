@@ -7,22 +7,24 @@ class AppConfig {
 
   static const bool useMockData = true;
 
-  // Study area: Anini/Etalin, Dibang Valley, Arunachal Pradesh.
-  // Do not change without re-validating against the source imagery/GIS data.
-  static const double studyAreaMinLat = 28.60;
-  static const double studyAreaMaxLat = 28.85;
-  static const double studyAreaMinLng = 95.70;
-  static const double studyAreaMaxLng = 96.00;
+  // ── Study area: Dibang Valley, Arunachal Pradesh, India ────────────────────
+  static const double studyAreaMinLat = 28.10;
+  static const double studyAreaMaxLat = 28.95;
+  static const double studyAreaMinLng = 95.40;
+  static const double studyAreaMaxLng = 96.10;
 
-  static const double studyAreaCenterLat =
-      (studyAreaMinLat + studyAreaMaxLat) / 2;
-  static const double studyAreaCenterLng =
-      (studyAreaMinLng + studyAreaMaxLng) / 2;
+  static const double studyAreaCenterLat = 28.50;
+  static const double studyAreaCenterLng = 95.80;
 
-  static const double defaultMapZoom = 11.0;
+  static const double defaultMapZoom = 10.0;
 
   static const String district = 'Dibang Valley';
   static const String stateName = 'Arunachal Pradesh';
+
+  // Mathunli reference village for demo GPS fallback
+  static const double fallbackLat = 28.7156;
+  static const double fallbackLng = 95.6332;
+  static const String fallbackVillageName = 'Near Mathunli Village';
 
   static bool containsPoint(double lat, double lng) {
     return lat >= studyAreaMinLat &&

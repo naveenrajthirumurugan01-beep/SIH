@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/citizen_theme.dart';
 import '../../models/alert.dart';
 import '../../widgets/risk_badge.dart';
 
@@ -42,7 +43,11 @@ class _CitizenAlertsScreenState extends State<CitizenAlertsScreen> {
     final userLoc = appState.currentLocation;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Geofenced Early Warning Alerts')),
+      backgroundColor: CitizenTheme.background,
+      appBar: AppBar(
+        backgroundColor: CitizenTheme.primary,
+        title: const Text('Early Warning Alerts', style: TextStyle(color: Colors.white)),
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<HazardAlert>>(
@@ -54,7 +59,12 @@ class _CitizenAlertsScreenState extends State<CitizenAlertsScreen> {
 
             final alerts = snapshot.data!;
             if (alerts.isEmpty) {
-              return const Center(child: Text('No active hazard alerts in your region right now.'));
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('No active hazard alerts in your region right now.'),
+                ),
+              );
             }
 
             return ListView(
@@ -62,12 +72,17 @@ class _CitizenAlertsScreenState extends State<CitizenAlertsScreen> {
               children: [
                 // Geolocation Info Banner
                 Card(
-                  color: Theme.of(context).colorScheme.primaryContainer.withAlpha(102),
+                  color: CitizenTheme.primary.withAlpha(20),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: CitizenTheme.primary.withAlpha(50)),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
-                        const Icon(Icons.my_location, color: Colors.cyanAccent),
+                        const Icon(Icons.my_location, color: CitizenTheme.primary),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -80,7 +95,7 @@ class _CitizenAlertsScreenState extends State<CitizenAlertsScreen> {
                                     ),
                               ),
                               Text(
-                                'Matching your GPS location (${userLoc.latitude.toStringAsFixed(4)}, ${userLoc.longitude.toStringAsFixed(4)}) in ${appState.deviceId.contains("device") ? "NER Region" : "Your Area"}',
+                                'Matching GPS location (${userLoc.latitude.toStringAsFixed(4)}°N, ${userLoc.longitude.toStringAsFixed(4)}°E) in Sikkim region',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
@@ -121,6 +136,9 @@ class _AlertCard extends StatelessWidget {
     final isNearby = distanceKm <= alert.radiusKm || distanceKm <= 50.0;
 
     return Card(
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -152,30 +170,31 @@ class _AlertCard extends StatelessWidget {
                 const Spacer(),
                 Text(
                   '${distanceKm.toStringAsFixed(1)} km away',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.cyan,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: CitizenTheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(alert.title, style: Theme.of(context).textTheme.titleSmall),
+            Text(alert.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 4),
-            Text(alert.message),
+            Text(alert.message, style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.location_city, size: 14, color: Theme.of(context).colorScheme.outline),
+                Icon(Icons.location_city, size: 14, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
                 Text(
                   'District: ${alert.district}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
                 const Spacer(),
                 Text(
                   DateFormat('d MMM, HH:mm').format(alert.createdAt),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),

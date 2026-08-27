@@ -1,6 +1,5 @@
-/// Citizen-facing risk classification. Deliberately just four plain-language
-/// bands (no raw ML scores/jargon surfaced to citizens) — see
-/// core/theme.dart for the color mapping used throughout the Citizen UI.
+import 'package:latlong2/latlong.dart';
+
 enum RiskLevel { low, moderate, high, critical }
 
 extension RiskLevelX on RiskLevel {
@@ -8,7 +7,7 @@ extension RiskLevelX on RiskLevel {
         RiskLevel.low => 'Low',
         RiskLevel.moderate => 'Moderate',
         RiskLevel.high => 'High',
-        RiskLevel.critical => 'Critical',
+        RiskLevel.critical => 'Very High',
       };
 
   String get firestoreValue => switch (this) {
@@ -18,6 +17,13 @@ extension RiskLevelX on RiskLevel {
         RiskLevel.critical => 'critical',
       };
 
+  static RiskLevel fromScore(double score) {
+    if (score >= 0.75) return RiskLevel.critical;
+    if (score >= 0.50) return RiskLevel.high;
+    if (score >= 0.25) return RiskLevel.moderate;
+    return RiskLevel.low;
+  }
+
   static RiskLevel fromFirestoreValue(String value) => switch (value) {
         'moderate' => RiskLevel.moderate,
         'high' => RiskLevel.high,
@@ -26,23 +32,28 @@ extension RiskLevelX on RiskLevel {
       };
 }
 
-/// A point-based risk zone (a village, known slide scar, or monitored slope)
-/// somewhere inside the Anini/Etalin study area. Backed either by
-/// MockRiskRepository (synthetic, seeded) or FirestoreRiskRepository (reads
-/// the `risk_zones` collection) — see lib/services/risk_repository.dart.
+/// Interface / Data Model for Landslide Risk Zones.
+/// Designed for future integration with ML/FastAPI backend (raster/polygons).
 class RiskZone {
   final String id;
   final String name;
   final double lat;
   final double lng;
-
-  /// Approximate radius (km) over which this zone's risk level is
-  /// considered representative, used for "nearest zone to me" lookups.
   final double radiusKm;
+  final double riskScore;
   final RiskLevel level;
   final String district;
   final DateTime updatedAt;
   final String? notes;
+
+  // Geographic Polygon points for semi-transparent heatmap overlay
+  final List<LatLng> polygonPoints;
+
+  // Risk factor breakdowns (Slope, Rainfall, Soil Moisture, History)
+  final String slopeFactor;
+  final String rainfallFactor;
+  final String soilMoistureFactor;
+  final String historyFactor;
 
   const RiskZone({
     required this.id,
@@ -50,23 +61,35 @@ class RiskZone {
     required this.lat,
     required this.lng,
     required this.radiusKm,
+    required this.riskScore,
     required this.level,
     required this.district,
     required this.updatedAt,
     this.notes,
+    this.polygonPoints = const [],
+    this.slopeFactor = 'MODERATE',
+    this.rainfallFactor = 'MODERATE',
+    this.soilMoistureFactor = 'MODERATE',
+    this.historyFactor = 'LOW',
   });
 
   factory RiskZone.fromFirestore(String id, Map<String, dynamic> data) {
+    final score = (data['risk_score'] as num?)?.toDouble() ?? 0.15;
     return RiskZone(
       id: id,
       name: data['name'] as String? ?? 'Unnamed zone',
       lat: (data['lat'] as num?)?.toDouble() ?? 0,
       lng: (data['lng'] as num?)?.toDouble() ?? 0,
       radiusKm: (data['radius_km'] as num?)?.toDouble() ?? 2.0,
-      level: RiskLevelX.fromFirestoreValue(data['level'] as String? ?? 'low'),
-      district: data['district'] as String? ?? '',
+      riskScore: score,
+      level: RiskLevelX.fromScore(score),
+      district: data['district'] as String? ?? 'Dibang Valley',
       updatedAt: DateTime.tryParse(data['updated_at'] as String? ?? '') ?? DateTime.now(),
       notes: data['notes'] as String?,
+      slopeFactor: data['slope_factor'] as String? ?? 'MODERATE',
+      rainfallFactor: data['rainfall_factor'] as String? ?? 'HIGH',
+      soilMoistureFactor: data['soil_moisture_factor'] as String? ?? 'HIGH',
+      historyFactor: data['history_factor'] as String? ?? 'MODERATE',
     );
   }
 
@@ -75,9 +98,14 @@ class RiskZone {
         'lat': lat,
         'lng': lng,
         'radius_km': radiusKm,
+        'risk_score': riskScore,
         'level': level.firestoreValue,
         'district': district,
         'updated_at': updatedAt.toIso8601String(),
         'notes': notes,
+        'slope_factor': slopeFactor,
+        'rainfall_factor': rainfallFactor,
+        'soil_moisture_factor': soilMoistureFactor,
+        'history_factor': historyFactor,
       };
 }
