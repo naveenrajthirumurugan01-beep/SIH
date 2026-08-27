@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../features/field_official/screens/field_officer_dashboard_screen.dart';
 import 'my_inspections_screen.dart';
 import 'task_list_screen.dart';
 
-/// Bottom-nav shell for the two persistent Field Officer destinations.
-/// Task detail / geofence check / inspection form are pushed on top of
-/// this as a linear flow from a task list entry, not separate tabs.
+import '../../widgets/field_sync_banner.dart';
+
+/// Bottom-nav shell for persistent Field Officer destinations: Dashboard, Tasks, and Inspections.
 class FieldOfficerShell extends StatefulWidget {
   const FieldOfficerShell({super.key});
 
@@ -19,16 +20,31 @@ class _FieldOfficerShellState extends State<FieldOfficerShell> {
   @override
   Widget build(BuildContext context) {
     final screens = const [
+      FieldOfficerDashboardScreen(),
       TaskListScreen(),
       MyInspectionsScreen(),
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _index, children: screens),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const FieldSyncBanner(),
+            Expanded(
+              child: IndexedStack(index: _index, children: screens),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (index) => setState(() => _index = index),
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
           NavigationDestination(
             icon: Icon(Icons.assignment_outlined),
             selectedIcon: Icon(Icons.assignment),
@@ -37,7 +53,7 @@ class _FieldOfficerShellState extends State<FieldOfficerShell> {
           NavigationDestination(
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history),
-            label: 'My Inspections',
+            label: 'Inspections',
           ),
         ],
       ),

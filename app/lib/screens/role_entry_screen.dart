@@ -3,12 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../core/app_state.dart';
 import '../models/user_role.dart';
-import '../services/task_repository.dart';
 
-/// PLACEHOLDER FOR REAL LOGIN. Shown at launch whenever AppState.currentRole
-/// is null (see main.dart), and reachable again any time via the "switch
-/// role" action in each shell. Stands in for a real Firebase Auth
-/// signup/role-selection flow — replace once that exists.
+import '../features/field_official/screens/field_officer_login_screen.dart';
+
+/// Role Selection & Auth Launch Entry Screen.
 class RoleEntryScreen extends StatefulWidget {
   const RoleEntryScreen({super.key});
 
@@ -18,21 +16,13 @@ class RoleEntryScreen extends StatefulWidget {
 
 class _RoleEntryScreenState extends State<RoleEntryScreen> {
   UserRole _selected = UserRole.citizen;
-  final _nameController = TextEditingController();
-  final _idController = TextEditingController(text: demoOfficerUid);
 
-  bool get _canContinue {
-    if (_selected != UserRole.fieldOfficial) return true;
-    return _nameController.text.trim().isNotEmpty && _idController.text.trim().isNotEmpty;
-  }
-
-  void _continue() {
+  Future<void> _continue() async {
     final appState = context.read<AppState>();
     if (_selected == UserRole.fieldOfficial) {
-      appState.setRole(
-        UserRole.fieldOfficial,
-        officerName: _nameController.text.trim(),
-        officerId: _idController.text.trim(),
+      // Require real email/password authentication & role verification for Field Officer
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const FieldOfficerLoginScreen()),
       );
     } else {
       appState.setRole(_selected);
@@ -59,7 +49,7 @@ class _RoleEntryScreenState extends State<RoleEntryScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Demo build — no login yet. Choose how to continue.',
+                  'Choose portal to continue.',
                   style: Theme.of(context).textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -81,26 +71,31 @@ class _RoleEntryScreenState extends State<RoleEntryScreen> {
                       setState(() => _selected = selection.first),
                 ),
                 if (_selected == UserRole.fieldOfficial) ...[
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _nameController,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(labelText: 'Officer Name'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _idController,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: 'Officer ID',
-                      helperText: 'Keep "demo_officer" to see the seeded demo tasks',
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.lock_outline, size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Field Officer portal requires credential authentication & role verification.',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: _canContinue ? _continue : null,
-                  child: const Text('Continue'),
+                  onPressed: _continue,
+                  child: Text(_selected == UserRole.fieldOfficial ? 'Proceed to Officer Login' : 'Continue'),
                 ),
               ],
             ),
