@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/responsive.dart';
 import '../../models/inspection.dart';
 
 class MyInspectionsScreen extends StatelessWidget {
@@ -23,10 +24,10 @@ class MyInspectionsScreen extends StatelessWidget {
 
           final inspections = snapshot.data!;
           if (inspections.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
+                padding: ResponsivePadding.defaultPadding(context),
+                child: const Text(
                   'No inspections submitted yet.',
                   textAlign: TextAlign.center,
                 ),
@@ -35,9 +36,10 @@ class MyInspectionsScreen extends StatelessWidget {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: ResponsivePadding.defaultPadding(context),
             itemCount: inspections.length,
-            itemBuilder: (context, index) => _InspectionCard(inspection: inspections[index]),
+            itemBuilder: (context, index) =>
+                _InspectionCard(inspection: inspections[index]),
           );
         },
       ),
@@ -60,7 +62,9 @@ class _InspectionCard extends StatelessWidget {
           hazard ? Icons.warning_amber : Icons.check_circle,
           color: hazard ? const Color(0xFFEF6C00) : const Color(0xFF2E7D32),
         ),
-        title: Text(DateFormat('d MMM y, HH:mm').format(inspection.submittedAt)),
+        title: Text(
+          DateFormat('d MMM y, HH:mm').format(inspection.submittedAt),
+        ),
         subtitle: Text(hazard ? 'Hazard confirmed' : 'No hazard found'),
         children: [
           Padding(
@@ -71,7 +75,9 @@ class _InspectionCard extends StatelessWidget {
                 Text('Crack: ${inspection.crackStatus.label}'),
                 Text('Slope movement: ${inspection.slopeMovement.label}'),
                 Text('Rockfall: ${inspection.rockfall ? 'Yes' : 'No'}'),
-                Text('Water seepage: ${inspection.waterSeepage ? 'Yes' : 'No'}'),
+                Text(
+                  'Water seepage: ${inspection.waterSeepage ? 'Yes' : 'No'}',
+                ),
                 Text('Road condition: ${inspection.roadCondition.label}'),
                 if (inspection.notes.isNotEmpty) ...[
                   const SizedBox(height: 8),

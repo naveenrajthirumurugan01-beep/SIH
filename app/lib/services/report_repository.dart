@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
-import '../core/app_config.dart';
+import '../dev/synthetic_dataset.dart';
 import '../models/report.dart';
 import '../models/user_role.dart';
 
@@ -40,41 +40,13 @@ abstract class ReportRepository {
 /// its local file path only — there is no upload step, since there's no
 /// Storage bucket to upload to without a real Firebase project.
 class MockReportRepository implements ReportRepository {
-  /// Fixed id for the seeded "crack near retaining wall" demo report, so
-  /// MockTaskRepository can link a task to it without a runtime lookup.
-  static const demoSeedReportId = 'demo_crack_report_1';
-  static const demoSeedReportLat = 28.8020;
-  static const demoSeedReportLng = 95.8180;
-
-  final List<Report> _reports = [];
+  /// SYNTHETIC — replace me. Seeded from the shared [SyntheticDataset] (see
+  /// lib/dev/synthetic_dataset.dart) so the Reports Queue isn't empty on
+  /// first load — previously started empty until a citizen submitted
+  /// something in that exact running session.
+  final List<Report> _reports = List.of(SyntheticDataset.instance.reports);
   final StreamController<void> _changes = StreamController<void>.broadcast();
   int _nextId = 1;
-
-  /// Seeds the demo crack report under [citizenUid] the first time this is
-  /// called; not called automatically anymore now that real accounts
-  /// exist, but kept for local mock-mode testing. No-op if already seeded.
-  void seedDemoDataIfNeeded(String citizenUid) {
-    if (_reports.any((r) => r.id == demoSeedReportId)) return;
-    _reports.add(
-      Report(
-        id: demoSeedReportId,
-        reporterUid: citizenUid,
-        reporterRole: UserRole.citizen,
-        hazardType: HazardType.crack,
-        description:
-            'Crack near the retaining wall along the Anini-Etalin road, roughly '
-            '1.5m long and appears to be widening after recent rain.',
-        lat: demoSeedReportLat,
-        lng: demoSeedReportLng,
-        district: AppConfig.district,
-        mediaUrls: const [],
-        status: ReportStatus.fieldVerification,
-        trustWeight: 1.0,
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-    );
-    _changes.add(null);
-  }
 
   List<Report> _filtered(String uid) {
     final mine = _reports.where((r) => r.reporterUid == uid).toList()

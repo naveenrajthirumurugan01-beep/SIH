@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/responsive.dart';
 import '../../models/report.dart';
 import '../../widgets/hazard_icons.dart';
 import '../../widgets/status_stepper.dart';
@@ -37,7 +38,7 @@ class MyReportsScreen extends StatelessWidget {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: context.responsiveValue(mobile: const EdgeInsets.all(12), tablet: const EdgeInsets.all(16), desktop: const EdgeInsets.all(16)),
             itemCount: reports.length,
             itemBuilder: (context, index) => _ReportCard(report: reports[index]),
           );

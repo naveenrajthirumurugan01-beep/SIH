@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../core/geo_utils.dart';
+import '../dev/synthetic_dataset.dart';
 import '../models/inspection.dart';
 import '../models/report.dart';
 import '../models/task.dart';
@@ -45,7 +46,11 @@ class MockInspectionRepository implements InspectionRepository {
   final ReportRepository reportRepository;
   final TaskRepository taskRepository;
 
-  final List<FieldInspection> _inspections = [];
+  /// SYNTHETIC — replace me. Seeded from the shared [SyntheticDataset] (see
+  /// lib/dev/synthetic_dataset.dart) so the completed synthetic tasks have
+  /// real field-reported findings to show in the Inspection Queue's detail
+  /// view, instead of the badge/detail section rendering nothing.
+  final List<FieldInspection> _inspections = List.of(SyntheticDataset.instance.fieldInspections);
   final StreamController<void> _changes = StreamController<void>.broadcast();
   int _nextId = 1;
 

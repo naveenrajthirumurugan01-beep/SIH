@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../core/app_config.dart';
+import '../dev/synthetic_dataset.dart';
 import '../models/alert.dart';
-import '../models/risk_zone.dart';
 
 abstract class AlertRepository {
   /// All alerts, newest first.
@@ -13,50 +12,18 @@ abstract class AlertRepository {
   /// automatic threshold-triggered alerting yet, which is a deliberate
   /// scope decision for this prototype, not a missing feature.
   Future<HazardAlert> createAlert(HazardAlert alert);
+
+  /// Moves an alert through the Analyst's response workflow (Review →
+  /// Acknowledge → Assign → Escalate → Resolve — see
+  /// screens/analyst/alerts_screen.dart's action buttons).
+  Future<void> updateAlertStatus(String alertId, AlertStatus newStatus);
 }
 
-/// SYNTHETIC — replace me. Seeded alert history for the Anini/Etalin study
-/// area, for demo purposes only.
+/// SYNTHETIC — replace me. Alerts come from the shared [SyntheticDataset]
+/// (see lib/dev/synthetic_dataset.dart), tied to the highest-riskScore
+/// zones in that same dataset.
 class MockAlertRepository implements AlertRepository {
-  static final List<HazardAlert> _alerts = [
-    HazardAlert(
-      id: 'alert_1',
-      title: 'Critical landslide risk — Dri River Slope',
-      message:
-          'Heavy rainfall over the past 48h has raised risk near the Dri River '
-          'Slope to critical. Avoid travel through this area if possible.',
-      severity: RiskLevel.critical,
-      lat: 28.7891,
-      lng: 95.8328,
-      radiusKm: 3.0,
-      district: AppConfig.district,
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-    ),
-    HazardAlert(
-      id: 'alert_2',
-      title: 'High risk advisory — Ithun Valley Slope',
-      message:
-          'Slope monitoring indicates elevated risk near Ithun Valley. '
-          'Field verification is underway.',
-      severity: RiskLevel.high,
-      lat: 28.7647,
-      lng: 95.8248,
-      radiusKm: 2.5,
-      district: AppConfig.district,
-      createdAt: DateTime.now().subtract(const Duration(hours: 20)),
-    ),
-    HazardAlert(
-      id: 'alert_3',
-      title: 'Moderate risk — Etalin Confluence Area',
-      message: 'Minor slope movement reported by a field official. Monitoring continues.',
-      severity: RiskLevel.moderate,
-      lat: 28.7500,
-      lng: 95.8500,
-      radiusKm: 3.0,
-      district: AppConfig.district,
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-  ];
+  static final List<HazardAlert> _alerts = List.of(SyntheticDataset.instance.alerts);
 
   int _nextId = 1;
 
@@ -74,6 +41,13 @@ class MockAlertRepository implements AlertRepository {
     final saved = alert._withId('mock_alert_${_nextId++}');
     _alerts.add(saved);
     return saved;
+  }
+
+  @override
+  Future<void> updateAlertStatus(String alertId, AlertStatus newStatus) async {
+    final index = _alerts.indexWhere((a) => a.id == alertId);
+    if (index == -1) return;
+    _alerts[index] = _alerts[index].copyWith(status: newStatus);
   }
 }
 
@@ -95,6 +69,14 @@ class FirestoreAlertRepository implements AlertRepository {
     final docRef = await _firestore.collection(_collection).add(alert.toFirestore());
     return alert._withId(docRef.id);
   }
+
+  @override
+  Future<void> updateAlertStatus(String alertId, AlertStatus newStatus) {
+    return _firestore
+        .collection(_collection)
+        .doc(alertId)
+        .update({'status': newStatus.firestoreValue});
+  }
 }
 
 extension _AlertWithId on HazardAlert {
@@ -108,5 +90,8 @@ extension _AlertWithId on HazardAlert {
         radiusKm: radiusKm,
         district: district,
         createdAt: createdAt,
+        status: status,
+        source: source,
+        recommendedAction: recommendedAction,
       );
 }

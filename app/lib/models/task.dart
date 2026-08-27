@@ -4,15 +4,18 @@ import 'risk_zone.dart';
 /// Where a task is in the officer's workflow. `unassigned` is a new
 /// pre-assigned state (only reachable via automatic assignment finding no
 /// available officer — see services/auto_assignment_service.dart);
-/// otherwise: assigned -> (enRoute once they start navigating) -> (onSite
-/// once the geofence check passes) -> completed (inspection submitted).
-/// `cancelled` is a separate terminal state (e.g. task withdrawn by an
-/// analyst) not reachable from this app yet.
-enum InspectionTaskStatus { unassigned, assigned, enRoute, onSite, completed, cancelled }
+/// otherwise: notified (Field Officer has been notified but hasn't
+/// responded yet) -> assigned (the officer accepted — see
+/// [InspectionTask.acceptedAt]) -> (enRoute once they start navigating) ->
+/// (onSite once the geofence check passes) -> completed (inspection
+/// submitted). `cancelled` is a separate terminal state (e.g. task
+/// withdrawn by an analyst) not reachable from this app yet.
+enum InspectionTaskStatus { unassigned, notified, assigned, enRoute, onSite, completed, cancelled }
 
 extension InspectionTaskStatusX on InspectionTaskStatus {
   String get firestoreValue => switch (this) {
         InspectionTaskStatus.unassigned => 'unassigned',
+        InspectionTaskStatus.notified => 'notified',
         InspectionTaskStatus.assigned => 'assigned',
         InspectionTaskStatus.enRoute => 'en_route',
         InspectionTaskStatus.onSite => 'on_site',
@@ -20,9 +23,13 @@ extension InspectionTaskStatusX on InspectionTaskStatus {
         InspectionTaskStatus.cancelled => 'cancelled',
       };
 
+  /// User-facing label. `assigned` reads as "Accepted" — see the enum doc
+  /// comment — everywhere this label is shown (task lists, filters,
+  /// status chips), not just on the Field Officer side.
   String get label => switch (this) {
         InspectionTaskStatus.unassigned => 'Unassigned',
-        InspectionTaskStatus.assigned => 'Assigned',
+        InspectionTaskStatus.notified => 'Notified',
+        InspectionTaskStatus.assigned => 'Accepted',
         InspectionTaskStatus.enRoute => 'En Route',
         InspectionTaskStatus.onSite => 'On Site',
         InspectionTaskStatus.completed => 'Completed',
@@ -31,6 +38,7 @@ extension InspectionTaskStatusX on InspectionTaskStatus {
 
   static InspectionTaskStatus fromFirestoreValue(String value) => switch (value) {
         'unassigned' => InspectionTaskStatus.unassigned,
+        'notified' => InspectionTaskStatus.notified,
         'en_route' => InspectionTaskStatus.enRoute,
         'on_site' => InspectionTaskStatus.onSite,
         'completed' => InspectionTaskStatus.completed,
@@ -112,6 +120,23 @@ class InspectionTask {
   final String? assignedBy;
   final GeofenceStatus geofenceStatus;
 
+  /// When this task was last (re)assigned to its current
+  /// [assignedOfficerUid] — set by TaskRepository.assignTask, distinct
+  /// from [createdAt] so a reassignment doesn't lose the task's original
+  /// creation time. Null for tasks assigned before this field existed.
+  final DateTime? assignedAt;
+
+  /// Analyst-set target completion date for the current assignment — see
+  /// TaskRepository.assignTask. Null when not set.
+  final DateTime? dueDate;
+
+  /// When the Field Officer accepted this task — set by
+  /// TaskRepository.acceptTask, which is what moves [status] from
+  /// [InspectionTaskStatus.notified] to [InspectionTaskStatus.assigned].
+  /// Null while still notified/unassigned, or for tasks created before
+  /// this field existed.
+  final DateTime? acceptedAt;
+
   const InspectionTask({
     required this.id,
     required this.lat,
@@ -127,12 +152,19 @@ class InspectionTask {
     this.linkedReportId,
     this.assignedBy,
     this.geofenceStatus = GeofenceStatus.active,
+    this.assignedAt,
+    this.dueDate,
+    this.acceptedAt,
   });
 
   InspectionTask copyWith({
     InspectionTaskStatus? status,
     String? assignedOfficerUid,
     GeofenceStatus? geofenceStatus,
+    String? assignedBy,
+    DateTime? assignedAt,
+    DateTime? dueDate,
+    DateTime? acceptedAt,
   }) {
     return InspectionTask(
       id: id,
@@ -147,8 +179,11 @@ class InspectionTask {
       createdAt: createdAt,
       geofence: geofence,
       assignmentType: assignmentType,
-      assignedBy: assignedBy,
+      assignedBy: assignedBy ?? this.assignedBy,
       geofenceStatus: geofenceStatus ?? this.geofenceStatus,
+      assignedAt: assignedAt ?? this.assignedAt,
+      dueDate: dueDate ?? this.dueDate,
+      acceptedAt: acceptedAt ?? this.acceptedAt,
     );
   }
 
@@ -172,6 +207,9 @@ class InspectionTask {
       assignedBy: data['assigned_by'] as String?,
       geofenceStatus:
           GeofenceStatusX.fromFirestoreValue(data['geofence_status'] as String? ?? 'active'),
+      assignedAt: DateTime.tryParse(data['assigned_at'] as String? ?? ''),
+      dueDate: DateTime.tryParse(data['due_date'] as String? ?? ''),
+      acceptedAt: DateTime.tryParse(data['accepted_at'] as String? ?? ''),
     );
   }
 
@@ -189,5 +227,8 @@ class InspectionTask {
         'assignment_type': assignmentType.firestoreValue,
         'assigned_by': assignedBy,
         'geofence_status': geofenceStatus.firestoreValue,
+        'assigned_at': assignedAt?.toIso8601String(),
+        'due_date': dueDate?.toIso8601String(),
+        'accepted_at': acceptedAt?.toIso8601String(),
       };
 }

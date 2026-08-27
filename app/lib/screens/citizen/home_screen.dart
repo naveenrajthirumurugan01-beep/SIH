@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/responsive.dart';
 import '../../models/alert.dart';
 import '../../models/risk_zone.dart';
 import '../../widgets/risk_badge.dart';
@@ -63,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
-            onPressed: () => context.read<AppState>().authRepository.signOut(),
+            onPressed: () => context.read<AppState>().signOut(),
           ),
         ],
       ),
@@ -72,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : ListView(
-                padding: const EdgeInsets.all(16),
+                padding: context.responsiveValue(mobile: const EdgeInsets.all(12), tablet: const EdgeInsets.all(16), desktop: const EdgeInsets.all(16)),
                 children: [
                   if (_nearestZone != null) ...[
                     RiskBadge(level: _nearestZone!.level, big: true),

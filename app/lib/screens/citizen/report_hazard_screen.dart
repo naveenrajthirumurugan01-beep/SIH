@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_config.dart';
 import '../../core/app_state.dart';
+import '../../core/responsive.dart';
 import '../../models/report.dart';
 import '../../models/user_role.dart';
 import '../../widgets/hazard_icons.dart';
@@ -86,7 +87,7 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Report a Hazard')),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: context.responsiveValue(mobile: const EdgeInsets.all(12), tablet: const EdgeInsets.all(16), desktop: const EdgeInsets.all(16)),
         child: ListView(
           children: [
             Text('Hazard type', style: Theme.of(context).textTheme.titleSmall),

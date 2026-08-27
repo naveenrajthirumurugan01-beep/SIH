@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../core/app_config.dart';
 import '../core/geo_utils.dart';
+import '../dev/synthetic_dataset.dart';
 import '../models/risk_zone.dart';
 
 abstract class RiskRepository {
@@ -11,91 +11,13 @@ abstract class RiskRepository {
   Future<RiskZone?> getNearestZone(double lat, double lng);
 }
 
-/// SYNTHETIC — replace me. Seeded risk zones for the Anini/Etalin study
-/// area. Two zones are anchored at Bhuvan-confirmed landslide points
-/// (28.7891, 95.8328 and 28.7647, 95.8248); every other zone/coordinate
-/// here is a placeholder for demo purposes only and carries no real
-/// terrain/rainfall analysis behind it.
+/// SYNTHETIC — replace me. Zones come from the shared
+/// [SyntheticDataset] (see lib/dev/synthetic_dataset.dart) so every field
+/// — including riskScore/level/historicalEventCount — is generated
+/// together and stays internally consistent, rather than each repository
+/// inventing its own independent numbers.
 class MockRiskRepository implements RiskRepository {
-  static final List<RiskZone> _zones = [
-    RiskZone(
-      id: 'zone_confirmed_1',
-      name: 'Confirmed Slide Point — Dri River Slope',
-      lat: 28.7891,
-      lng: 95.8328,
-      radiusKm: 1.5,
-      level: RiskLevel.critical,
-      district: AppConfig.district,
-      updatedAt: DateTime.now(),
-      notes: 'SYNTHETIC — anchored at a Bhuvan-confirmed landslide point.',
-    ),
-    RiskZone(
-      id: 'zone_confirmed_2',
-      name: 'Confirmed Slide Point — Ithun Valley Slope',
-      lat: 28.7647,
-      lng: 95.8248,
-      radiusKm: 1.5,
-      level: RiskLevel.high,
-      district: AppConfig.district,
-      updatedAt: DateTime.now(),
-      notes: 'SYNTHETIC — anchored at a Bhuvan-confirmed landslide point.',
-    ),
-    RiskZone(
-      id: 'zone_anini_town',
-      name: 'Anini Township',
-      lat: 28.8167,
-      lng: 95.8333,
-      radiusKm: 3.0,
-      level: RiskLevel.moderate,
-      district: AppConfig.district,
-      updatedAt: DateTime.now(),
-      notes: 'SYNTHETIC placeholder — not model-derived.',
-    ),
-    RiskZone(
-      id: 'zone_etalin',
-      name: 'Etalin Confluence Area',
-      lat: 28.7500,
-      lng: 95.8500,
-      radiusKm: 3.0,
-      level: RiskLevel.moderate,
-      district: AppConfig.district,
-      updatedAt: DateTime.now(),
-      notes: 'SYNTHETIC placeholder — not model-derived.',
-    ),
-    RiskZone(
-      id: 'zone_north_ridge',
-      name: 'Northern Ridge Belt',
-      lat: 28.8400,
-      lng: 95.7600,
-      radiusKm: 4.0,
-      level: RiskLevel.low,
-      district: AppConfig.district,
-      updatedAt: DateTime.now(),
-      notes: 'SYNTHETIC placeholder — not model-derived.',
-    ),
-    RiskZone(
-      id: 'zone_south_valley',
-      name: 'Southern Valley Belt',
-      lat: 28.6500,
-      lng: 95.9200,
-      radiusKm: 4.0,
-      level: RiskLevel.low,
-      district: AppConfig.district,
-      updatedAt: DateTime.now(),
-      notes: 'SYNTHETIC placeholder — not model-derived.',
-    ),
-    RiskZone(
-      id: 'zone_west_slope',
-      name: 'Western Slope Corridor',
-      lat: 28.7200,
-      lng: 95.7300,
-      radiusKm: 3.0,
-      level: RiskLevel.moderate,
-      district: AppConfig.district,
-      updatedAt: DateTime.now(),
-      notes: 'SYNTHETIC placeholder — not model-derived.',
-    ),
-  ];
+  static final List<RiskZone> _zones = SyntheticDataset.instance.zones;
 
   @override
   Future<List<RiskZone>> getRiskZones() async {

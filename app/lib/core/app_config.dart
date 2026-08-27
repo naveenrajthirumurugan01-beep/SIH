@@ -6,7 +6,14 @@
 class AppConfig {
   AppConfig._();
 
-  static const bool useMockData = false;
+  static const bool useMockData = true;
+
+  // TEMPORARY — set to false to restore normal login before
+  // submission/production. Do not remove the real auth code, this only
+  // bypasses the SignInScreen UI: RoleSelectScreen still signs in for
+  // real via authRepository.signIn() with known demo credentials, so
+  // every Firestore security rule still authenticates normally.
+  static const bool skipAuthForDemo = true;
 
   // Study area: Anini/Etalin, Dibang Valley, Arunachal Pradesh.
   // Do not change without re-validating against the source imagery/GIS data.

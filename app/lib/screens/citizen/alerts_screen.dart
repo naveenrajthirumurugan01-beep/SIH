@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/responsive.dart';
 import '../../models/alert.dart';
 import '../../widgets/risk_badge.dart';
 
@@ -24,7 +25,9 @@ class _CitizenAlertsScreenState extends State<CitizenAlertsScreen> {
 
   Future<void> _refresh() async {
     final future = context.read<AppState>().alertRepository.getAlerts();
-    setState(() => _alertsFuture = future);
+    setState(() {
+      _alertsFuture = future;
+    });
     await future;
   }
 
@@ -47,7 +50,7 @@ class _CitizenAlertsScreenState extends State<CitizenAlertsScreen> {
             }
 
             return ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: context.responsiveValue(mobile: const EdgeInsets.all(12), tablet: const EdgeInsets.all(16), desktop: const EdgeInsets.all(16)),
               itemCount: alerts.length,
               itemBuilder: (context, index) => _AlertCard(alert: alerts[index]),
             );
@@ -75,9 +78,12 @@ class _AlertCard extends StatelessWidget {
               children: [
                 RiskBadge(level: alert.severity),
                 const SizedBox(width: 8),
-                Text(
-                  DateFormat('d MMM y, HH:mm').format(alert.createdAt),
-                  style: Theme.of(context).textTheme.bodySmall,
+                Flexible(
+                  child: Text(
+                    DateFormat('d MMM y, HH:mm').format(alert.createdAt),
+                    style: Theme.of(context).textTheme.bodySmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

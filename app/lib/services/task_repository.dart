@@ -2,26 +2,16 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../models/geofence.dart';
+import '../dev/synthetic_dataset.dart';
 import '../models/report.dart';
-import '../models/risk_zone.dart';
 import '../models/task.dart';
 import 'report_repository.dart';
-
-/// The real Firebase Auth uid for the field@gmail.com demo Field Officer
-/// account (see the bootstrap that created its users/{uid} doc). Auth is
-/// always real (AppState/AuthRepository don't check AppConfig.useMockData),
-/// so even MockTaskRepository's seed data has to target a real uid for
-/// tasks to show up when signed in as that account. Real assignment
-/// otherwise goes through actual Field Officer accounts — see
-/// AuthRepository.watchEnabledFieldOfficers and
-/// screens/analyst/reports_queue_screen.dart / tasks_screen.dart.
-const demoFieldOfficerUid = 'D37iiSHTW6YXreM1qfX9a3bq5XD3';
 
 /// Task statuses that count as "still open" for the purposes of the
 /// automatic-assignment fairness rule (see auto_assignment_service.dart) —
 /// deliberately excludes completed/cancelled/unassigned.
 const activeTaskStatuses = {
+  InspectionTaskStatus.notified,
   InspectionTaskStatus.assigned,
   InspectionTaskStatus.enRoute,
   InspectionTaskStatus.onSite,
@@ -54,67 +44,44 @@ abstract class TaskRepository {
   /// InspectionRepository uses when an inspection is submitted, just run
   /// at assignment time instead of completion time.
   Future<InspectionTask> createTask(InspectionTask task);
+
+  /// Manually (re)assigns an existing task to [officerUid] — the Analyst
+  /// Inspections page's "Assign Field Officer" flow. Distinct from
+  /// [createTask]: this targets a task that already exists (whether
+  /// unassigned or previously assigned to someone else), not a brand-new
+  /// one. Always resets [InspectionTask.status] to
+  /// [InspectionTaskStatus.assigned] — a (re)assignment means whoever now
+  /// holds it hasn't started yet, even if a previous officer had — and
+  /// stamps [InspectionTask.assignedAt]/[InspectionTask.assignedBy] with
+  /// this action, leaving [InspectionTask.createdAt] untouched.
+  Future<void> assignTask(
+    String taskId, {
+    required String officerUid,
+    required String assignedBy,
+    DateTime? dueDate,
+  });
+
+  /// Field Officer accepts a task currently in
+  /// [InspectionTaskStatus.notified] — stamps [InspectionTask.acceptedAt]
+  /// and moves [InspectionTask.status] to [InspectionTaskStatus.assigned],
+  /// which is what unlocks the inspection flow (geofence check, inspection
+  /// form) on the Field Officer side.
+  Future<void> acceptTask(String taskId);
 }
 
-/// SYNTHETIC — replace me. Two seeded tasks: one linked to the demo crack
-/// report (see MockReportRepository.demoSeedReportId), one at the
-/// critical-risk landslide-inventory point with no citizen report behind
-/// it yet.
+/// SYNTHETIC — replace me. Tasks come from the shared [SyntheticDataset]
+/// (see lib/dev/synthetic_dataset.dart), spread across every status and
+/// assigned to the real field@gmail.com Field Officer account so signing
+/// in as that account actually sees them.
 class MockTaskRepository implements TaskRepository {
   MockTaskRepository({required this.reportRepository});
 
   final ReportRepository reportRepository;
 
-  final List<InspectionTask> _tasks = [
-    InspectionTask(
-      id: 'task_1',
-      assignedOfficerUid: demoFieldOfficerUid,
-      linkedReportId: MockReportRepository.demoSeedReportId,
-      lat: MockReportRepository.demoSeedReportLat,
-      lng: MockReportRepository.demoSeedReportLng,
-      riskLevel: RiskLevel.high,
-      reason: 'Citizen report: crack near retaining wall',
-      instructions:
-          'Inspect the reported crack near the retaining wall along the '
-          'Anini-Etalin road. Check whether it is actively widening, look '
-          'for related slope movement nearby, and photograph the crack '
-          'with a size reference.',
-      status: InspectionTaskStatus.assigned,
-      createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-      geofence: Geofence.circle(
-        centerLat: MockReportRepository.demoSeedReportLat,
-        centerLng: MockReportRepository.demoSeedReportLng,
-        radiusMeters: 5000, // high severity
-      ),
-      assignmentType: AssignmentType.manual,
-      assignedBy: 'demo_analyst',
-    ),
-    InspectionTask(
-      id: 'task_2',
-      assignedOfficerUid: demoFieldOfficerUid,
-      lat: 28.7891,
-      lng: 95.8328,
-      riskLevel: RiskLevel.critical,
-      reason: 'AI flagged rising risk — no citizen report yet',
-      instructions:
-          'Verify current slope condition at the Dri River Slope monitoring '
-          'point. Model output shows a sharp rise in predicted risk over the '
-          'last 48h; confirm whether visible ground movement, cracking, or '
-          'water saturation supports that.',
-      status: InspectionTaskStatus.assigned,
-      createdAt: DateTime.now().subtract(const Duration(hours: 1)),
-      geofence: const Geofence(
-        type: GeofenceType.circle,
-        centerLat: 28.7891,
-        centerLng: 95.8328,
-        radiusMeters: 8000, // critical severity
-      ),
-      assignmentType: AssignmentType.automatic,
-    ),
-  ];
+  final List<InspectionTask> _tasks = List.of(SyntheticDataset.instance.tasks);
 
   final StreamController<void> _changes = StreamController<void>.broadcast();
-  int _nextId = 3; // task_1 and task_2 are already taken by the seed data
+  int _nextId = 1;
 
   int _riskThenRecency(InspectionTask a, InspectionTask b) {
     final riskCompare = b.riskLevel.index.compareTo(a.riskLevel.index);
@@ -190,6 +157,36 @@ class MockTaskRepository implements TaskRepository {
     }
 
     return saved;
+  }
+
+  @override
+  Future<void> assignTask(
+    String taskId, {
+    required String officerUid,
+    required String assignedBy,
+    DateTime? dueDate,
+  }) async {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index == -1) return;
+    _tasks[index] = _tasks[index].copyWith(
+      assignedOfficerUid: officerUid,
+      status: InspectionTaskStatus.assigned,
+      assignedBy: assignedBy,
+      assignedAt: DateTime.now(),
+      dueDate: dueDate,
+    );
+    _changes.add(null);
+  }
+
+  @override
+  Future<void> acceptTask(String taskId) async {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index == -1) return;
+    _tasks[index] = _tasks[index].copyWith(
+      status: InspectionTaskStatus.assigned,
+      acceptedAt: DateTime.now(),
+    );
+    _changes.add(null);
   }
 }
 
@@ -275,6 +272,30 @@ class FirestoreTaskRepository implements TaskRepository {
     }
 
     return saved;
+  }
+
+  @override
+  Future<void> assignTask(
+    String taskId, {
+    required String officerUid,
+    required String assignedBy,
+    DateTime? dueDate,
+  }) {
+    return _firestore.collection(_collection).doc(taskId).update({
+      'assigned_officer_uid': officerUid,
+      'status': InspectionTaskStatus.assigned.firestoreValue,
+      'assigned_by': assignedBy,
+      'assigned_at': DateTime.now().toIso8601String(),
+      'due_date': dueDate?.toIso8601String(),
+    });
+  }
+
+  @override
+  Future<void> acceptTask(String taskId) {
+    return _firestore.collection(_collection).doc(taskId).update({
+      'status': InspectionTaskStatus.assigned.firestoreValue,
+      'accepted_at': DateTime.now().toIso8601String(),
+    });
   }
 }
 

@@ -23,6 +23,11 @@ ml/data/processed/*
 ml/models/*.joblib
 ml/.ipynb_checkpoints/
 
+# Raw geospatial/reference datasets (2GB+, several files over GitHub's
+# 100MB hard limit) — not meant to be versioned, same rationale as
+# ml/data/raw/ above.
+/datas/
+
 # Node / Firebase Functions
 functions/node_modules/
 functions/lib/

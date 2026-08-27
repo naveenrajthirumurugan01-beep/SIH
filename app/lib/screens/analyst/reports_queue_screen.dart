@@ -1,22 +1,32 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
-import '../../core/geofence_utils.dart';
-import '../../models/app_user.dart';
-import '../../models/geofence.dart';
+import '../../core/date_range_filter.dart';
+import '../../core/responsive.dart';
+import '../../models/alert.dart';
 import '../../models/report.dart';
 import '../../models/risk_zone.dart';
-import '../../models/task.dart';
 import '../../models/user_role.dart';
+import '../../services/report_severity.dart';
+import '../../widgets/async_state_views.dart';
 import '../../widgets/hazard_icons.dart';
+import 'assign_officer_dialog.dart';
 
 const _activeStatuses = {ReportStatus.submitted, ReportStatus.underReview};
 
-class ReportsQueueScreen extends StatelessWidget {
+class ReportsQueueScreen extends StatefulWidget {
   const ReportsQueueScreen({super.key});
+
+  @override
+  State<ReportsQueueScreen> createState() => _ReportsQueueScreenState();
+}
+
+class _ReportsQueueScreenState extends State<ReportsQueueScreen> {
+  DateRangePreset _dateFilter = DateRangePreset.allTime;
 
   @override
   Widget build(BuildContext context) {
@@ -24,38 +34,81 @@ class ReportsQueueScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Reports Queue')),
-      body: StreamBuilder<List<Report>>(
-        stream: appState.reportRepository.watchAllReports(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(context.isMobile ? 12 : 16, 12, context.isMobile ? 12 : 16, 4),
+            child: Row(
+              children: [
+                Text('Submitted:', style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(width: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final preset in DateRangePreset.values)
+                      ChoiceChip(
+                        label: Text(preset.label),
+                        selected: _dateFilter == preset,
+                        onSelected: (_) => setState(() => _dateFilter = preset),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<List<Report>>(
+              stream: appState.reportRepository.watchAllReports(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return ErrorStateView(
+                    message: 'Could not load reports: ${snapshot.error}',
+                    onRetry: () => setState(() {}),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const LoadingView();
+                }
 
-          final reports = snapshot.data!;
-          final active = reports.where((r) => _activeStatuses.contains(r.status)).toList();
-          final inMotion = reports.where((r) => !_activeStatuses.contains(r.status)).toList();
+                final reports =
+                    snapshot.data!.where((r) => _dateFilter.includes(r.createdAt)).toList();
+                final active = reports.where((r) => _activeStatuses.contains(r.status)).toList();
+                final inMotion =
+                    reports.where((r) => !_activeStatuses.contains(r.status)).toList();
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (active.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text('No reports awaiting triage.', textAlign: TextAlign.center),
-                )
-              else
-                for (final report in active) _ActiveReportCard(report: report),
-              const SizedBox(height: 12),
-              ExpansionTile(
-                title: Text('Already in motion (${inMotion.length})'),
-                initiallyExpanded: false,
-                children: [
-                  for (final report in inMotion) _InMotionReportTile(report: report),
-                ],
-              ),
-            ],
-          );
-        },
+                if (reports.isEmpty) {
+                  return EmptyStateView(
+                    icon: Icons.inbox_outlined,
+                    message: _dateFilter == DateRangePreset.allTime
+                        ? 'No citizen or field reports yet.'
+                        : 'No reports submitted in the ${_dateFilter.label.toLowerCase()}.',
+                  );
+                }
+
+                return ListView(
+                  padding: EdgeInsets.all(context.isMobile ? 12 : 16),
+                  children: [
+                    if (active.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Text('No reports awaiting triage.', textAlign: TextAlign.center),
+                      )
+                    else
+                      for (final report in active) _ActiveReportCard(report: report),
+                    const SizedBox(height: 12),
+                    ExpansionTile(
+                      title: Text('Already in motion (${inMotion.length})'),
+                      initiallyExpanded: false,
+                      children: [
+                        for (final report in inMotion) _InMotionReportTile(report: report),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -65,6 +118,12 @@ class _ActiveReportCard extends StatelessWidget {
   final Report report;
 
   const _ActiveReportCard({required this.report});
+
+  Future<void> _setStatus(BuildContext context, ReportStatus status) async {
+    final appState = context.read<AppState>();
+    await appState.reportRepository.updateReportStatus(report.id, status);
+    appState.recordActivity('${status.label} report "${report.hazardType.label}"');
+  }
 
   Future<void> _assign(BuildContext context) async {
     final appState = context.read<AppState>();
@@ -80,56 +139,47 @@ class _ActiveReportCard extends StatelessWidget {
       return;
     }
 
-    final selected = await showDialog<AppUser>(
-      context: context,
-      builder: (dialogContext) => _AssignOfficerDialog(officers: officers),
-    );
-
-    if (selected == null || !context.mounted) return;
+    final officer = await pickFieldOfficer(context, officers);
+    if (officer == null || !context.mounted) return;
 
     // Ties the new task's risk level to the model's own read of this
     // location, rather than guessing — same data the citizen map shows.
     final nearestZone = await appState.riskRepository.getNearestZone(report.lat, report.lng);
-    final riskLevel = nearestZone?.level ?? RiskLevel.moderate;
+    final riskLevel = nearestZone?.level ?? inferredSeverityForReport(report);
 
-    await appState.taskRepository.createTask(
-      InspectionTask(
-        id: '',
-        assignedOfficerUid: selected.uid,
-        linkedReportId: report.id,
-        lat: report.lat,
-        lng: report.lng,
-        riskLevel: riskLevel,
-        reason: 'Citizen report: ${report.description}',
-        instructions:
-            'Field-verify the ${report.hazardType.label.toLowerCase()} reported at this '
-            'location. Reporter notes: "${report.description}"',
-        status: InspectionTaskStatus.assigned,
-        createdAt: DateTime.now(),
-        geofence: Geofence.circle(
-          centerLat: report.lat,
-          centerLng: report.lng,
-          radiusMeters: radiusMetersForSeverity(riskLevel),
-        ),
-        assignmentType: AssignmentType.manual,
-        assignedBy: appState.uid,
-      ),
+    await assignInspectionAt(
+      appState,
+      officer: officer,
+      lat: report.lat,
+      lng: report.lng,
+      riskLevel: riskLevel,
+      reason: 'Citizen report: ${report.description}',
+      instructions:
+          'Field-verify the ${report.hazardType.label.toLowerCase()} reported at this '
+          'location. Reporter notes: "${report.description}"',
+      linkedReportId: report.id,
+    );
+    // Assigning a field officer is what moves a report from triage into
+    // active field verification — previously this button created the task
+    // but left the report stuck as submitted/underReview forever.
+    await appState.reportRepository.updateReportStatus(report.id, ReportStatus.fieldVerification);
+    appState.recordActivity(
+      'Assigned report "${report.hazardType.label}" to ${officer.displayName ?? officer.email}',
     );
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Assigned to ${selected.displayName ?? selected.email}.')),
+      SnackBar(content: Text('Assigned to ${officer.displayName ?? officer.email}.')),
     );
   }
 
-  Future<void> _dismiss(BuildContext context) async {
-    final appState = context.read<AppState>();
+  Future<void> _reject(BuildContext context) async {
     final noteController = TextEditingController();
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Dismiss Report'),
+        title: const Text('Reject Report'),
         content: TextField(
           controller: noteController,
           maxLines: 3,
@@ -145,7 +195,7 @@ class _ActiveReportCard extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Dismiss'),
+            child: const Text('Reject'),
           ),
         ],
       ),
@@ -153,19 +203,43 @@ class _ActiveReportCard extends StatelessWidget {
 
     if (confirmed != true || !context.mounted) return;
 
-    // NOTE: the dismissal reason is not persisted — Report has no
+    // NOTE: the rejection reason is not persisted — Report has no
     // reviewer-note field yet. Surfaced only in this confirmation for now.
-    await appState.reportRepository.updateReportStatus(report.id, ReportStatus.rejected);
+    await _setStatus(context, ReportStatus.rejected);
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report rejected.')));
+  }
+
+  Future<void> _escalate(BuildContext context) async {
+    final appState = context.read<AppState>();
+    await appState.alertRepository.createAlert(
+      HazardAlert(
+        id: '',
+        title: 'Escalated citizen report — ${report.hazardType.label}',
+        message: report.description,
+        severity: RiskLevel.critical,
+        lat: report.lat,
+        lng: report.lng,
+        radiusKm: 3.0,
+        district: report.district,
+        createdAt: DateTime.now(),
+        source: AlertSource.citizenReport,
+        recommendedAction: 'Escalated by analyst from the Reports Queue — verify and dispatch urgently.',
+      ),
+    );
+    appState.recordActivity('Escalated report "${report.hazardType.label}" to a critical alert');
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Report dismissed.')),
+      const SnackBar(content: Text('Escalated — a critical alert was issued for this location.')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final thumbnail = report.mediaUrls.isEmpty ? null : report.mediaUrls.first;
+    final severity = inferredSeverityForReport(report);
 
     return Card(
       child: Padding(
@@ -197,22 +271,28 @@ class _ActiveReportCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
+            _ReportMeta(report: report, severity: severity),
+            const SizedBox(height: 8),
             Text(report.description),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _dismiss(context),
-                    child: const Text('Dismiss'),
+                if (report.status == ReportStatus.submitted)
+                  OutlinedButton(
+                    onPressed: () => _setStatus(context, ReportStatus.underReview),
+                    child: const Text('Review'),
                   ),
+                OutlinedButton(
+                  onPressed: () => _setStatus(context, ReportStatus.verified),
+                  child: const Text('Verify'),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => _assign(context),
-                    child: const Text('Assign Field Officer'),
-                  ),
+                OutlinedButton(onPressed: () => _reject(context), child: const Text('Reject')),
+                OutlinedButton(onPressed: () => _escalate(context), child: const Text('Escalate')),
+                FilledButton(
+                  onPressed: () => _assign(context),
+                  child: const Text('Assign Field Officer'),
                 ),
               ],
             ),
@@ -223,46 +303,37 @@ class _ActiveReportCard extends StatelessWidget {
   }
 }
 
-class _AssignOfficerDialog extends StatefulWidget {
-  final List<AppUser> officers;
+class _ReportMeta extends StatelessWidget {
+  final Report report;
+  final RiskLevel severity;
 
-  const _AssignOfficerDialog({required this.officers});
-
-  @override
-  State<_AssignOfficerDialog> createState() => _AssignOfficerDialogState();
-}
-
-class _AssignOfficerDialogState extends State<_AssignOfficerDialog> {
-  late AppUser _selected = widget.officers.first;
+  const _ReportMeta({required this.report, required this.severity});
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Assign Field Officer'),
-      content: DropdownButtonFormField<AppUser>(
-        initialValue: _selected,
-        decoration: const InputDecoration(labelText: 'Field Officer'),
-        items: [
-          for (final officer in widget.officers)
-            DropdownMenuItem(
-              value: officer,
-              child: Text(officer.displayName ?? officer.email),
-            ),
-        ],
-        onChanged: (officer) => setState(() => _selected = officer ?? _selected),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+    final style = Theme.of(context)
+        .textTheme
+        .bodySmall
+        ?.copyWith(color: Theme.of(context).colorScheme.outline);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ID: ${report.id} · Citizen: ${_shortUid(report.reporterUid)}', style: style),
+        Text(
+          '${report.lat.toStringAsFixed(4)}, ${report.lng.toStringAsFixed(4)} · '
+          '${DateFormat('d MMM y, HH:mm').format(report.createdAt)}',
+          style: style,
         ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_selected),
-          child: const Text('Assign'),
+        Text(
+          'Reported severity (estimated from hazard type): ${severity.label} · Status: ${report.status.label}',
+          style: style,
         ),
       ],
     );
   }
+
+  String _shortUid(String uid) => uid.length <= 8 ? uid : '${uid.substring(0, 8)}…';
 }
 
 class _Thumbnail extends StatelessWidget {
@@ -293,13 +364,17 @@ class _InMotionReportTile extends StatelessWidget {
     return ListTile(
       leading: Icon(iconForHazard(report.hazardType)),
       title: Text(report.description, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(report.status.label),
+      subtitle: Text(
+        '${report.status.label} · ${report.lat.toStringAsFixed(3)}, ${report.lng.toStringAsFixed(3)} · '
+        '${DateFormat('d MMM').format(report.createdAt)}',
+      ),
       trailing: report.status == ReportStatus.verified
           ? TextButton(
-              onPressed: () => context
-                  .read<AppState>()
-                  .reportRepository
-                  .updateReportStatus(report.id, ReportStatus.resolved),
+              onPressed: () {
+                final appState = context.read<AppState>();
+                appState.reportRepository.updateReportStatus(report.id, ReportStatus.resolved);
+                appState.recordActivity('Resolved report "${report.hazardType.label}"');
+              },
               child: const Text('Mark Resolved'),
             )
           : null,

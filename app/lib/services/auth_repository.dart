@@ -79,6 +79,9 @@ class AuthRepository {
       if (fbUser == null) return Stream<AppUser?>.value(null);
 
       return _firestore.collection(_collection).doc(fbUser.uid).snapshots().map((doc) {
+        // ignore: avoid_print
+        print('AuthRepository.currentAppUser snapshot: uid=${fbUser.uid} exists=${doc.exists} '
+            'fromCache=${doc.metadata.isFromCache} data=${doc.data()}');
         if (!doc.exists) return null;
         return AppUser.fromFirestore(fbUser.uid, doc.data()!);
       });

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/responsive.dart';
 import '../../models/user_role.dart';
 import 'sign_up_screen.dart';
 
@@ -52,8 +53,13 @@ class _SignInScreenState extends State<SignInScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
-      // Success: AppState's auth stream updates and main.dart's router
-      // takes over from here — nothing to navigate to manually.
+      // AppState's auth stream updates and main.dart's _AuthRouter (the
+      // MaterialApp's `home`, underneath this pushed route) rebuilds into
+      // the right shell — but that rebuild happens on the route beneath
+      // this one, so it stays invisible until we pop back to it.
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } on StateError catch (e) {
       // e.g. a Firebase Auth account with no matching users/{uid} doc yet.
       setState(() => _errorMessage = e.message);
@@ -73,7 +79,7 @@ class _SignInScreenState extends State<SignInScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: ResponsivePadding.defaultPadding(context),
             child: Form(
               key: _formKey,
               child: Column(

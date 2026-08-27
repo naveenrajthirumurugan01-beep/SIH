@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/responsive.dart';
 import '../../models/inspection.dart';
 import '../../models/task.dart';
 import '../../services/location_service.dart';
@@ -57,7 +58,10 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
       await appState.inspectionRepository.submitInspection(
         task: widget.task,
         officerUid: appState.uid,
-        officerName: appState.currentUser?.displayName ?? appState.currentUser?.email ?? 'Field Officer',
+        officerName:
+            appState.currentUser?.displayName ??
+            appState.currentUser?.email ??
+            'Field Officer',
         checkInLat: widget.checkInLat,
         checkInLng: widget.checkInLng,
         checkInAt: widget.checkInAt,
@@ -74,7 +78,9 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inspection submitted. Linked report updated.')),
+        const SnackBar(
+          content: Text('Inspection submitted. Linked report updated.'),
+        ),
       );
       Navigator.of(context).popUntil((route) => route.isFirst);
     } finally {
@@ -87,89 +93,101 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Inspection Form')),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: ResponsivePadding.defaultPadding(context),
         child: ListView(
           children: [
-            Text('Crack status', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final status in CrackStatus.values)
-                  ChoiceChip(
-                    label: Text(status.label),
-                    selected: _crackStatus == status,
-                    onSelected: (_) => setState(() => _crackStatus = status),
+                Text(
+                  'Crack status',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final status in CrackStatus.values)
+                      ChoiceChip(
+                        label: Text(status.label),
+                        selected: _crackStatus == status,
+                        onSelected: (_) =>
+                            setState(() => _crackStatus = status),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Slope movement',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final movement in SlopeMovement.values)
+                      ChoiceChip(
+                        label: Text(movement.label),
+                        selected: _slopeMovement == movement,
+                        onSelected: (_) =>
+                            setState(() => _slopeMovement = movement),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Rockfall observed'),
+                  value: _rockfall,
+                  onChanged: (value) => setState(() => _rockfall = value),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Water seepage observed'),
+                  value: _waterSeepage,
+                  onChanged: (value) => setState(() => _waterSeepage = value),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Road condition',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final condition in RoadCondition.values)
+                      ChoiceChip(
+                        label: Text(condition.label),
+                        selected: _roadCondition == condition,
+                        onSelected: (_) =>
+                            setState(() => _roadCondition = condition),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _notesController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes (optional)',
+                    border: OutlineInputBorder(),
                   ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Text('Slope movement', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final movement in SlopeMovement.values)
-                  ChoiceChip(
-                    label: Text(movement.label),
-                    selected: _slopeMovement == movement,
-                    onSelected: (_) => setState(() => _slopeMovement = movement),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Rockfall observed'),
-              value: _rockfall,
-              onChanged: (value) => setState(() => _rockfall = value),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Water seepage observed'),
-              value: _waterSeepage,
-              onChanged: (value) => setState(() => _waterSeepage = value),
-            ),
-            const SizedBox(height: 8),
-            Text('Road condition', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final condition in RoadCondition.values)
-                  ChoiceChip(
-                    label: Text(condition.label),
-                    selected: _roadCondition == condition,
-                    onSelected: (_) => setState(() => _roadCondition = condition),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _notesController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _addPhoto,
-              icon: const Icon(Icons.camera_alt),
-              label: Text('Add Photo (${_photos.length})'),
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _isSubmitting ? null : _submit,
-              child: _isSubmitting
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Submit Inspection'),
-            ),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: _addPhoto,
+                  icon: const Icon(Icons.camera_alt),
+                  label: Text('Add Photo (${_photos.length})'),
+                ),
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _isSubmitting ? null : _submit,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Submit Inspection'),
+                ),
           ],
         ),
       ),

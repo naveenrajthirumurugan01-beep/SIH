@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../core/responsive.dart';
 import '../../models/user_role.dart';
 
 /// Citizen self-registration only. Field Officer and Analyst are fixed
@@ -46,8 +47,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
             role: UserRole.citizen,
             displayName: _nameController.text.trim(),
           );
-      // Success: AppState's auth stream picks up the new account and
-      // main.dart's router sends it straight into CitizenShell.
+      // AppState's auth stream picks up the new account and main.dart's
+      // _AuthRouter (underneath this pushed route, and the SignInScreen
+      // route this was pushed from) rebuilds into CitizenShell — pop back
+      // to it so that becomes visible.
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = e.message ?? 'Sign up failed.');
     } catch (e) {
@@ -63,7 +69,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       appBar: AppBar(title: const Text('Create Account')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: ResponsivePadding.defaultPadding(context),
           child: Form(
             key: _formKey,
             child: Column(

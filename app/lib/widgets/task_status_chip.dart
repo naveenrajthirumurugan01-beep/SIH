@@ -6,6 +6,7 @@ import '../models/task.dart';
 /// color means the same thing everywhere it appears.
 Color colorForTaskStatus(InspectionTaskStatus status) => switch (status) {
       InspectionTaskStatus.unassigned => Colors.grey,
+      InspectionTaskStatus.notified => const Color(0xFF6A1B9A),
       InspectionTaskStatus.assigned => Colors.blueGrey,
       InspectionTaskStatus.enRoute => const Color(0xFFF9A825),
       InspectionTaskStatus.onSite => const Color(0xFFEF6C00),
