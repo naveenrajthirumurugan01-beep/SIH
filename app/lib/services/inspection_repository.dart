@@ -101,7 +101,7 @@ class MockInspectionRepository implements InspectionRepository {
       submittedAt: DateTime.now(),
       submissionLat: submissionLat,
       submissionLng: submissionLng,
-      locationVerifiedAtSubmission: isInsideGeofence(submissionLat, submissionLng, task.geofence),
+      locationVerifiedAtSubmission: isInsideGeofence(submissionLat, submissionLng, task.boundary),
     );
 
     _inspections.add(inspection);
@@ -188,7 +188,7 @@ class FirestoreInspectionRepository implements InspectionRepository {
       submittedAt: DateTime.now(),
       submissionLat: submissionLat,
       submissionLng: submissionLng,
-      locationVerifiedAtSubmission: isInsideGeofence(submissionLat, submissionLng, task.geofence),
+      locationVerifiedAtSubmission: isInsideGeofence(submissionLat, submissionLng, task.boundary),
     );
 
     final docRef = await _firestore.collection(_collection).add(inspection.toFirestore());

@@ -42,7 +42,6 @@ class LandslideEwsApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: appState),
         ChangeNotifierProvider.value(value: syncService),
-        ChangeNotifierProvider(create: (_) => AuthProvider(AuthService())),
       ],
       child: MaterialApp(
         title: 'NER Landslide EWS',

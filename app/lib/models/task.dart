@@ -1,14 +1,15 @@
 import 'geofence_boundary.dart';
 import 'risk_zone.dart';
 
-/// Where a task is in the officer's workflow: assigned -> (enRoute once
-/// they start navigating) -> (onSite once the geofence check passes) ->
-/// completed (inspection submitted). `cancelled` is a separate terminal
-/// state (e.g. task withdrawn by an analyst) not reachable from this app yet.
-enum InspectionTaskStatus { assigned, enRoute, onSite, completed, cancelled }
+enum InspectionTaskStatus { unassigned, assigned, enRoute, onSite, completed, cancelled }
+
+enum AssignmentType { auto, manual }
+
+enum GeofenceStatus { inside, outside, unknown }
 
 extension InspectionTaskStatusX on InspectionTaskStatus {
   String get firestoreValue => switch (this) {
+        InspectionTaskStatus.unassigned => 'unassigned',
         InspectionTaskStatus.assigned => 'assigned',
         InspectionTaskStatus.enRoute => 'en_route',
         InspectionTaskStatus.onSite => 'on_site',
@@ -17,6 +18,7 @@ extension InspectionTaskStatusX on InspectionTaskStatus {
       };
 
   String get label => switch (this) {
+        InspectionTaskStatus.unassigned => 'Unassigned',
         InspectionTaskStatus.assigned => 'Assigned',
         InspectionTaskStatus.enRoute => 'En Route',
         InspectionTaskStatus.onSite => 'On Site',
@@ -25,6 +27,7 @@ extension InspectionTaskStatusX on InspectionTaskStatus {
       };
 
   static InspectionTaskStatus fromFirestoreValue(String value) => switch (value) {
+        'unassigned' => InspectionTaskStatus.unassigned,
         'en_route' => InspectionTaskStatus.enRoute,
         'on_site' => InspectionTaskStatus.onSite,
         'completed' => InspectionTaskStatus.completed,
@@ -33,26 +36,24 @@ extension InspectionTaskStatusX on InspectionTaskStatus {
       };
 }
 
-/// A field inspection assignment. Not every task originates from a citizen
-/// report — [linkedReportId] is null for tasks the risk model itself
-/// flagged (see reason text), and set when a citizen/field report drove
-/// the assignment.
 class InspectionTask {
-  final String id; // Inspection Assignment ID
-  final String assignedOfficerUid; // Field Officer ID / Firebase UID
-  final String riskZoneId; // Risk Zone ID
-  final String locationName; // Location / District Name
-  final double lat; // Target Latitude
-  final double lng; // Target Longitude
-  final RiskLevel riskLevel; // Risk Level (critical, high, medium, low)
-  final String priority; // Priority (Urgent, High, Medium, Low)
-  final String assignedBy; // Analyst or Engine name
-  final String reason; // Trigger reason
-  final String instructions; // Operational instructions
-  final InspectionTaskStatus status; // Lifecycle status
-  final double geofenceRadiusMeters; // Geofence radius
-  final DateTime createdAt; // Assigned timestamp
-  final String? linkedReportId; // Optional linked report ID
+  final String id;
+  final String assignedOfficerUid;
+  final String riskZoneId;
+  final String locationName;
+  final double lat;
+  final double lng;
+  final RiskLevel riskLevel;
+  final String priority;
+  final String assignedBy;
+  final String reason;
+  final String instructions;
+  final InspectionTaskStatus status;
+  final double geofenceRadiusMeters;
+  final DateTime createdAt;
+  final String? linkedReportId;
+  final AssignmentType assignmentType;
+  final GeofenceStatus geofenceStatus;
   final GeofenceBoundary? _customBoundary;
 
   const InspectionTask({
@@ -71,10 +72,11 @@ class InspectionTask {
     this.assignedBy = 'Analyst Desk',
     this.geofenceRadiusMeters = 100.0,
     this.linkedReportId,
+    this.assignmentType = AssignmentType.manual,
+    this.geofenceStatus = GeofenceStatus.unknown,
     GeofenceBoundary? customBoundary,
   }) : _customBoundary = customBoundary;
 
-  /// Dynamic Geofence Boundary attached to this Inspection ID
   GeofenceBoundary get boundary {
     if (_customBoundary != null) return _customBoundary;
     return GeofenceBoundary.radius(
@@ -84,10 +86,14 @@ class InspectionTask {
     );
   }
 
+  GeofenceBoundary get geofence => boundary;
+
   InspectionTask copyWith({
     InspectionTaskStatus? status,
     String? assignedOfficerUid,
     String? priority,
+    AssignmentType? assignmentType,
+    GeofenceStatus? geofenceStatus,
     GeofenceBoundary? customBoundary,
   }) {
     return InspectionTask(
@@ -106,6 +112,8 @@ class InspectionTask {
       geofenceRadiusMeters: geofenceRadiusMeters,
       createdAt: createdAt,
       linkedReportId: linkedReportId,
+      assignmentType: assignmentType ?? this.assignmentType,
+      geofenceStatus: geofenceStatus ?? this.geofenceStatus,
       customBoundary: customBoundary ?? _customBoundary,
     );
   }
@@ -133,6 +141,10 @@ class InspectionTask {
       geofenceRadiusMeters: radius,
       createdAt: DateTime.tryParse(data['created_at'] as String? ?? '') ?? DateTime.now(),
       linkedReportId: data['linked_report_id'] as String?,
+      assignmentType: data['assignment_type'] == 'auto' ? AssignmentType.auto : AssignmentType.manual,
+      geofenceStatus: data['geofence_status'] == 'inside'
+          ? GeofenceStatus.inside
+          : (data['geofence_status'] == 'outside' ? GeofenceStatus.outside : GeofenceStatus.unknown),
       customBoundary: GeofenceBoundary.fromFirestore(boundaryData, lat, lng, radius),
     );
   }
@@ -152,6 +164,8 @@ class InspectionTask {
         'geofence_radius_meters': geofenceRadiusMeters,
         'created_at': createdAt.toIso8601String(),
         'linked_report_id': linkedReportId,
+        'assignment_type': assignmentType == AssignmentType.auto ? 'auto' : 'manual',
+        'geofence_status': geofenceStatus.name,
         'geofence_boundary': boundary.toFirestore(),
       };
 }

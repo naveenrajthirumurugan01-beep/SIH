@@ -151,7 +151,7 @@ class _TaskTile extends StatelessWidget {
             ),
             Text(
               'Geofence: ${task.geofence.radiusMeters.toStringAsFixed(0)}m radius '
-              '(${task.geofenceStatus == GeofenceStatus.active ? 'active' : 'inactive'})',
+              '(${task.geofenceStatus != GeofenceStatus.outside ? 'active' : 'inactive'})',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
@@ -305,10 +305,10 @@ class _FlagZoneDialogState extends State<_FlagZoneDialog> {
             'not from a citizen report — confirm current ground conditions.',
         status: InspectionTaskStatus.assigned,
         createdAt: DateTime.now(),
-        geofence: Geofence.circle(
+        customBoundary: GeofenceBoundary.radius(
           centerLat: zone.lat,
           centerLng: zone.lng,
-          radiusMeters: radiusMeters.clamp(1, _maxManualRadiusMeters),
+          radiusMeters: radiusMeters.clamp(1, 10000),
         ),
         assignmentType: AssignmentType.manual,
         assignedBy: appState.uid,

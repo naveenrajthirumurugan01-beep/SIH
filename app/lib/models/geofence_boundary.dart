@@ -4,31 +4,33 @@ import '../core/geo_utils.dart';
 
 enum GeofenceType { radius, polygon }
 
-/// Dynamic Geofence Boundary abstraction for Field Officer inspection tasks.
-/// Supports both Radial boundaries (MVP) and Polygon GIS risk zone boundaries (Future).
+typedef Geofence = GeofenceBoundary;
+
 abstract class GeofenceBoundary {
   GeofenceType get type;
+  double get radiusMeters;
+  double get centerLat;
+  double get centerLng;
 
-  /// Returns true if [lat] and [lng] fall inside the dynamic inspection boundary
   bool containsPoint(double lat, double lng);
-
-  /// Returns the distance in meters to the target center or nearest boundary edge
   double distanceMetersTo(double lat, double lng);
-
-  /// Human-readable label describing the boundary size
   String get boundaryDescription;
 
-  /// Factory for Radial Geofence
   factory GeofenceBoundary.radius({
     required double centerLat,
     required double centerLng,
     required double radiusMeters,
   }) = RadialGeofenceBoundary;
 
-  /// Factory for Polygon GIS Geofence
   factory GeofenceBoundary.polygon({
     required List<LatLng> vertices,
   }) = PolygonGeofenceBoundary;
+
+  factory GeofenceBoundary.circle({
+    required double centerLat,
+    required double centerLng,
+    required double radiusMeters,
+  }) = RadialGeofenceBoundary;
 
   Map<String, dynamic> toFirestore();
 
@@ -70,10 +72,12 @@ abstract class GeofenceBoundary {
   }
 }
 
-/// Radial Geofence Implementation
 class RadialGeofenceBoundary implements GeofenceBoundary {
+  @override
   final double centerLat;
+  @override
   final double centerLng;
+  @override
   final double radiusMeters;
 
   const RadialGeofenceBoundary({
@@ -107,7 +111,6 @@ class RadialGeofenceBoundary implements GeofenceBoundary {
       };
 }
 
-/// Polygon GIS Risk Zone Geofence Implementation (Ray-Casting Algorithm)
 class PolygonGeofenceBoundary implements GeofenceBoundary {
   final List<LatLng> vertices;
 
@@ -116,7 +119,21 @@ class PolygonGeofenceBoundary implements GeofenceBoundary {
   @override
   GeofenceType get type => GeofenceType.polygon;
 
-  /// Ray-Casting Algorithm for Point-in-Polygon evaluation
+  @override
+  double get radiusMeters => 500.0;
+
+  @override
+  double get centerLat {
+    if (vertices.isEmpty) return 0.0;
+    return vertices.map((v) => v.latitude).reduce((a, b) => a + b) / vertices.length;
+  }
+
+  @override
+  double get centerLng {
+    if (vertices.isEmpty) return 0.0;
+    return vertices.map((v) => v.longitude).reduce((a, b) => a + b) / vertices.length;
+  }
+
   @override
   bool containsPoint(double lat, double lng) {
     if (vertices.length < 3) return false;
@@ -142,17 +159,7 @@ class PolygonGeofenceBoundary implements GeofenceBoundary {
 
   @override
   double distanceMetersTo(double lat, double lng) {
-    // Distance to centroid of polygon
-    double sumLat = 0;
-    double sumLng = 0;
-    for (final v in vertices) {
-      sumLat += v.latitude;
-      sumLng += v.longitude;
-    }
-    final centroidLat = sumLat / vertices.length;
-    final centroidLng = sumLng / vertices.length;
-
-    return distanceMeters(lat, lng, centroidLat, centroidLng);
+    return distanceMeters(lat, lng, centerLat, centerLng);
   }
 
   @override
@@ -165,7 +172,6 @@ class PolygonGeofenceBoundary implements GeofenceBoundary {
       };
 }
 
-/// Dynamic Evaluation Result Container
 class GeofenceEvaluationResult {
   final String inspectionId;
   final String riskZoneId;

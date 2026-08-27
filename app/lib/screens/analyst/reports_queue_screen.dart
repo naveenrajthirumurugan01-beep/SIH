@@ -105,10 +105,10 @@ class _ActiveReportCard extends StatelessWidget {
             'location. Reporter notes: "${report.description}"',
         status: InspectionTaskStatus.assigned,
         createdAt: DateTime.now(),
-        geofence: Geofence.circle(
+        customBoundary: GeofenceBoundary.radius(
           centerLat: report.lat,
           centerLng: report.lng,
-          radiusMeters: radiusMetersForSeverity(riskLevel),
+          radiusMeters: 500.0,
         ),
         assignmentType: AssignmentType.manual,
         assignedBy: appState.uid,
