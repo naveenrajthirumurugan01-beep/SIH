@@ -1,8 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
-import '../../core/app_state.dart';
 import '../../core/citizen_theme.dart';
 import '../../models/digital_twin_prediction.dart';
 import '../../models/risk_zone.dart';
@@ -83,6 +80,50 @@ class _CitizenDigitalTwinScreenState extends State<CitizenDigitalTwinScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading || _prediction == null) {
+      return Scaffold(
+        backgroundColor: CitizenTheme.background,
+        appBar: AppBar(
+          backgroundColor: CitizenTheme.primary,
+          title: const Text('DIGITAL TWIN — EMERGING RISK', style: TextStyle(color: Colors.white, fontSize: 14)),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Dynamic evolution properties based on timeline step (0: NOW, 1: +6h, 2: +12h, 3: +18h, 4: +24h)
+    final dynamicRiskLevel = switch (_timeStepIndex) {
+      0 => RiskLevel.moderate,
+      1 => RiskLevel.high,
+      2 => RiskLevel.critical,
+      3 => RiskLevel.critical,
+      _ => RiskLevel.critical,
+    };
+
+    final dynamicRiskChange = switch (_timeStepIndex) {
+      0 => '+0.05',
+      1 => '+0.15',
+      2 => '+0.22',
+      3 => '+0.30',
+      _ => '+0.38 (HIGH ALERT)',
+    };
+
+    final dynamicTimeHorizon = switch (_timeStepIndex) {
+      0 => '0–3 hours (Developing Movement)',
+      1 => '3–6 hours (Kinematic Acceleration)',
+      2 => '6–12 hours (High Pore Pressure)',
+      3 => '12–18 hours (Failure Threshold Exceeded)',
+      _ => '18–24+ hours (🚨 HIGH CRITICAL ALERT)',
+    };
+
+    final dynamicWarningText = switch (_timeStepIndex) {
+      0 => 'A landslide risk is developing in your monitored area near Mathunli East Ridge. Stay alert and monitor local advisories.',
+      1 => 'Elevated landslide risk detected in Mathunli East Ridge. Kinematic acceleration observed. Avoid travelling through slope sections.',
+      2 => 'A critical landslide risk is developing in your monitored area near Mathunli East Ridge. Avoid unnecessary travel through the affected zone and follow official safety instructions.',
+      3 => 'CRITICAL SAFETY WARNING: Slope movement threshold exceeded. High probability of imminent mass failure.',
+      _ => '🚨 EMERGENCY HIGH CRITICAL ALERT: Severe catastrophic landslide failure predicted for Mathunli East Ridge (DV-014). RELOCATE FROM MONITORED ZONE IMMEDIATELY.',
+    };
+
     return Scaffold(
       backgroundColor: CitizenTheme.background,
       appBar: AppBar(
@@ -108,179 +149,182 @@ class _CitizenDigitalTwinScreenState extends State<CitizenDigitalTwinScreen> {
           ),
         ],
       ),
-      body: _loading || _prediction == null
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── 1. DIRECT SAFETY WARNING CARD ───────────────────────
+            Container(
+              width: double.infinity,
+              color: _timeStepIndex >= 2 ? const Color(0xFFFFEBEE) : const Color(0xFFFFF3E0),
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _timeStepIndex >= 4 ? Icons.gavel_rounded : Icons.warning_amber_rounded,
+                    color: _timeStepIndex >= 2 ? Colors.red : Colors.orange.shade900,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _timeStepIndex >= 4
+                              ? '🚨 HIGH CRITICAL EMERGENCY ALERT'
+                              : (_timeStepIndex >= 2 ? '⚠️ ADVANCE SAFETY WARNING' : '⚠️ ELEVATED LANDSLIDE ADVISORY'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _timeStepIndex >= 2 ? Colors.red : Colors.orange.shade900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          dynamicWarningText,
+                          style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── 2. GIS MAP VISUALIZATION WITH OVERLAYS ──────────────
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── 1. DIRECT SAFETY WARNING CARD ───────────────────────
-                  Container(
-                    width: double.infinity,
-                    color: const Color(0xFFFFEBEE),
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                '⚠️ ADVANCE SAFETY WARNING',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'A landslide risk is developing in your monitored area near Mathunli East Ridge. '
-                                'Avoid unnecessary travel through the affected zone and follow official safety instructions.',
-                                style: TextStyle(fontSize: 12, color: Colors.black87, height: 1.3),
-                              ),
-                            ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.map, size: 16, color: CitizenTheme.primary),
+                          SizedBox(width: 6),
+                          Text(
+                            'PREDICTIVE LANDSLIDE RISK MAP',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _timeStepIndex >= 3 ? Colors.red.shade100 : Colors.amber.shade100,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          _timeLabels[_timeStepIndex],
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _timeStepIndex >= 3 ? Colors.red.shade900 : Colors.amber.shade900,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-
-                  // ── 2. GIS MAP VISUALIZATION WITH OVERLAYS ──────────────
-                  Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.map, size: 16, color: CitizenTheme.primary),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'PREDICTIVE LANDSLIDE RISK MAP',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade100,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _timeLabels[_timeStepIndex],
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.amber.shade900,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Satellite GIS Map
-                        GisMapWidget(
-                          height: 280,
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        // ── 3. TIMELINE & PLAY/PAUSE CONTROLS ─────────────
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Row(
-                            children: [
-                              IconButton(
-                                icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill),
-                                iconSize: 32,
-                                color: CitizenTheme.primary,
-                                onPressed: _togglePlayback,
-                              ),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: List.generate(_timeLabels.length, (idx) {
-                                      final selected = idx == _timeStepIndex;
-                                      return Padding(
-                                        padding: const EdgeInsets.only(right: 6),
-                                        child: ChoiceChip(
-                                          label: Text(
-                                            _timeLabels[idx],
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: selected ? Colors.white : Colors.black87,
-                                            ),
-                                          ),
-                                          selected: selected,
-                                          selectedColor: CitizenTheme.primary,
-                                          backgroundColor: Colors.white,
-                                          onSelected: (_) {
-                                            setState(() => _timeStepIndex = idx);
-                                          },
-                                        ),
-                                      );
-                                    }),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
                   const SizedBox(height: 8),
 
-                  // ── 4. CURRENT AFFECTED ZONE vs NEXT EMERGENT RISK ─────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Column(
+                  // Satellite GIS Map
+                  GisMapWidget(
+                    height: 280,
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // ── 3. TIMELINE & PLAY/PAUSE CONTROLS ─────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
                       children: [
-                        // Current Affected Zone Card
-                        _ZoneCard(
-                          title: 'CURRENT AFFECTED ZONE',
-                          zoneId: _prediction!.sourceIncident.zoneId,
-                          locationName: _prediction!.sourceIncident.locationName,
-                          riskLevel: _prediction!.sourceIncident.currentRiskLevel,
-                          timeHorizon: 'Active Incident Now',
-                          distanceKm: '0.0 km',
-                          isCurrent: true,
+                        IconButton(
+                          icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill),
+                          iconSize: 32,
+                          color: CitizenTheme.primary,
+                          onPressed: _togglePlayback,
                         ),
-
-                        const SizedBox(height: 10),
-
-                        // Next Emergent Risk Card
-                        _ZoneCard(
-                          title: 'NEXT EMERGENT RISK ZONE',
-                          zoneId: _prediction!.nextEmergentRisk.zoneId,
-                          locationName: _prediction!.nextEmergentRisk.locationName,
-                          riskLevel: _prediction!.nextEmergentRisk.predictedRiskLevel,
-                          timeHorizon: _prediction!.nextEmergentRisk.predictionHorizon,
-                          distanceKm: '${_prediction!.nextEmergentRisk.distanceFromIncidentKm} km from incident',
-                          riskChange: '+${_prediction!.nextEmergentRisk.riskChange.toStringAsFixed(2)}',
-                          isCurrent: false,
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: List.generate(_timeLabels.length, (idx) {
+                                final selected = idx == _timeStepIndex;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      _timeLabels[idx],
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: selected ? Colors.white : Colors.black87,
+                                      ),
+                                    ),
+                                    selected: selected,
+                                    selectedColor: idx >= 3 ? Colors.red.shade700 : CitizenTheme.primary,
+                                    backgroundColor: Colors.white,
+                                    onSelected: (_) {
+                                      setState(() => _timeStepIndex = idx);
+                                    },
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // ── 4. CURRENT AFFECTED ZONE vs NEXT EMERGENT RISK ─────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                children: [
+                  // Current Affected Zone Card
+                  _ZoneCard(
+                    title: 'CURRENT AFFECTED ZONE',
+                    zoneId: _prediction!.sourceIncident.zoneId,
+                    locationName: _prediction!.sourceIncident.locationName,
+                    riskLevel: _prediction!.sourceIncident.currentRiskLevel,
+                    timeHorizon: 'Active Incident Now',
+                    distanceKm: '0.0 km',
+                    isCurrent: true,
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Next Emergent Risk Card (Dynamically evolves across timeline!)
+                  _ZoneCard(
+                    title: 'NEXT EMERGENT RISK ZONE',
+                    zoneId: _prediction!.nextEmergentRisk.zoneId,
+                    locationName: _prediction!.nextEmergentRisk.locationName,
+                    riskLevel: dynamicRiskLevel,
+                    timeHorizon: dynamicTimeHorizon,
+                    distanceKm: '${_prediction!.nextEmergentRisk.distanceFromIncidentKm} km from incident',
+                    riskChange: dynamicRiskChange,
+                    isCurrent: false,
+                  ),
+                ],
+              ),
+            ),
 
                   const SizedBox(height: 12),
 
