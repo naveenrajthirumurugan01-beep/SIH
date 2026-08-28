@@ -6,7 +6,7 @@
 class AppConfig {
   AppConfig._();
 
-  static const bool useMockData = false;
+  static const bool useMockData = true;
 
   // ── Study area: Dibang Valley, Arunachal Pradesh, India ────────────────────
   static const double studyAreaMinLat = 28.10;

@@ -50,7 +50,10 @@ class _HomeScreenState extends State<HomeScreen> {
     // Background location refresh (non-blocking for UI render)
     appState.refreshLocation().catchError((_) {});
 
-    final alerts = await appState.alertRepository.getAlerts();
+    List<HazardAlert> alerts = [];
+    try {
+      alerts = await appState.alertRepository.getAlerts().timeout(const Duration(seconds: 1));
+    } catch (_) {}
 
     if (!mounted) return;
     setState(() {
