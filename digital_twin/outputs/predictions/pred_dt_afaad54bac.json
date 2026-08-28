@@ -1,0 +1,699 @@
+{
+  "prediction_id": "pred_dt_afaad54bac",
+  "timestamp": "2026-08-28T01:05:47.047343+00:00",
+  "simulation_scenario": "RAINFALL_PLUS_50",
+  "prediction_horizon_hours": 6.0,
+  "model_version": "v1.0.0-physics-twin",
+  "calculation_version": "v1.0-mohr-coulomb",
+  "dataset_version": "dibang_valley_synthetic_v1.0",
+  "simulation_status": "PROTOTYPE_SIMULATION",
+  "validation_status": "NOT_YET_VALIDATED_WITH_LOCAL_FIELD_OBSERVATIONS",
+  "source_incident": {
+    "zone_id": "DV-007",
+    "location_name": "Dri River Slope - Anini Highway Section",
+    "current_risk": 0.82,
+    "current_level": "CRITICAL"
+  },
+  "next_emergent_risk": {
+    "zone_id": "DV-011",
+    "location_name": "Dri River Bridge Support Slope",
+    "latitude": 28.798,
+    "longitude": 95.825,
+    "distance_from_current_incident": 1.25,
+    "current_risk": 0.8,
+    "predicted_risk": 0.88,
+    "risk_change": 0.08,
+    "current_level": "CRITICAL",
+    "predicted_level": "CRITICAL",
+    "prediction_horizon": "3\u20136 hours",
+    "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+    "dominant_factors": [
+      "increasing rainfall intensity",
+      "high soil saturation & water content",
+      "rising pore-water pressure",
+      "accelerating ground displacement",
+      "steep slope geometry susceptibility"
+    ],
+    "displacement_trend": "RAPIDLY_ACCELERATING",
+    "rainfall_state": {
+      "rainfall_intensity": 64.8,
+      "hourly_rainfall": 64.8,
+      "cumulative_rainfall": 411.6,
+      "antecedent_rainfall": 331.68,
+      "rainfall_duration": 21.0,
+      "forecast_rainfall": 0.0
+    },
+    "soil_moisture_state": {
+      "soil_moisture": 0.368,
+      "saturation": 0.817,
+      "permeability": 0.018,
+      "pore_water_pressure": 46.88,
+      "infiltration_state": "high_seepage"
+    },
+    "pore_pressure_state": {
+      "u_initial_kpa": 46.5,
+      "u_final_kpa": 46.88,
+      "effective_stress_final_kpa": 0.1
+    },
+    "stability_state": {
+      "factor_of_safety": 0.719,
+      "risk_score": 0.88,
+      "risk_level": "CRITICAL",
+      "landslide_flag": true
+    },
+    "rank_score": 0.618
+  },
+  "why_selected": [
+    "1. Pore pressure increased from 46.5 kPa to 46.88 kPa under infiltrating rainfall.",
+    "2. Effective stress reduced to 0.1 kPa, weakening Mohr-Coulomb shear strength.",
+    "3. Displacement trend transitioned to RAPIDLY_ACCELERATING with acceleration 0.8 mm/h\u00b2.",
+    "4. Slope geometry (54.0\u00b0) and high antecedence preconditioned terrain stability degradation.",
+    "5. Candidate exhibited highest emerging risk growth (+0.08) across 5.0 km spatial search radius."
+  ],
+  "physical_causality_chain": [
+    "Source Incident Identified",
+    "Spatial Candidate Area Created",
+    "Rainfall Infiltration & Pore-Fluid Coupling",
+    "Pore Pressure Buildup & Effective Stress Reduction",
+    "Shear Strength Degradation & Kinematic Acceleration",
+    "Risk Evolution & Timestep Integration",
+    "Emerging Risk Ranking",
+    "Selected Next Emergent Risk: DV-011"
+  ],
+  "candidate_rankings": [
+    {
+      "zone_id": "DV-011",
+      "location_name": "Dri River Bridge Support Slope",
+      "latitude": 28.798,
+      "longitude": 95.825,
+      "distance_from_current_incident": 1.25,
+      "current_risk": 0.8,
+      "predicted_risk": 0.88,
+      "risk_change": 0.08,
+      "current_level": "CRITICAL",
+      "predicted_level": "CRITICAL",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "high soil saturation & water content",
+        "rising pore-water pressure",
+        "accelerating ground displacement",
+        "steep slope geometry susceptibility"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 64.8,
+        "hourly_rainfall": 64.8,
+        "cumulative_rainfall": 411.6,
+        "antecedent_rainfall": 331.68,
+        "rainfall_duration": 21.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.368,
+        "saturation": 0.817,
+        "permeability": 0.018,
+        "pore_water_pressure": 46.88,
+        "infiltration_state": "high_seepage"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 46.5,
+        "u_final_kpa": 46.88,
+        "effective_stress_final_kpa": 0.1
+      },
+      "stability_state": {
+        "factor_of_safety": 0.719,
+        "risk_score": 0.88,
+        "risk_level": "CRITICAL",
+        "landslide_flag": true
+      },
+      "rank_score": 0.618
+    },
+    {
+      "zone_id": "DV-014",
+      "location_name": "Mathunli East Slope Ridge",
+      "latitude": 28.762,
+      "longitude": 95.815,
+      "distance_from_current_incident": 3.48,
+      "current_risk": 0.78,
+      "predicted_risk": 0.84,
+      "risk_change": 0.06,
+      "current_level": "CRITICAL",
+      "predicted_level": "CRITICAL",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "high soil saturation & water content",
+        "rising pore-water pressure",
+        "accelerating ground displacement",
+        "steep slope geometry susceptibility"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 63.11,
+        "hourly_rainfall": 63.11,
+        "cumulative_rainfall": 396.24,
+        "antecedent_rainfall": 317.23,
+        "rainfall_duration": 20.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.375,
+        "saturation": 0.834,
+        "permeability": 0.018,
+        "pore_water_pressure": 50.11,
+        "infiltration_state": "high_seepage"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 49.8,
+        "u_final_kpa": 50.11,
+        "effective_stress_final_kpa": 0.1
+      },
+      "stability_state": {
+        "factor_of_safety": 0.718,
+        "risk_score": 0.84,
+        "risk_level": "CRITICAL",
+        "landslide_flag": true
+      },
+      "rank_score": 0.591
+    },
+    {
+      "zone_id": "DV-008",
+      "location_name": "Anini South Bypass Slope",
+      "latitude": 28.775,
+      "longitude": 95.84,
+      "distance_from_current_incident": 1.72,
+      "current_risk": 0.72,
+      "predicted_risk": 0.81,
+      "risk_change": 0.09,
+      "current_level": "HIGH",
+      "predicted_level": "CRITICAL",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "high soil saturation & water content",
+        "rising pore-water pressure",
+        "accelerating ground displacement",
+        "steep slope geometry susceptibility"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 59.06,
+        "hourly_rainfall": 59.06,
+        "cumulative_rainfall": 370.19,
+        "antecedent_rainfall": 295.75,
+        "rainfall_duration": 19.5,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.359,
+        "saturation": 0.797,
+        "permeability": 0.018,
+        "pore_water_pressure": 43.6,
+        "infiltration_state": "high_seepage"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 43.2,
+        "u_final_kpa": 43.6,
+        "effective_stress_final_kpa": 0.1
+      },
+      "stability_state": {
+        "factor_of_safety": 0.722,
+        "risk_score": 0.81,
+        "risk_level": "CRITICAL",
+        "landslide_flag": true
+      },
+      "rank_score": 0.587
+    },
+    {
+      "zone_id": "DV-006",
+      "location_name": "Dri River Upper Catchment",
+      "latitude": 28.825,
+      "longitude": 95.86,
+      "distance_from_current_incident": 4.79,
+      "current_risk": 0.66,
+      "predicted_risk": 0.76,
+      "risk_change": 0.1,
+      "current_level": "HIGH",
+      "predicted_level": "CRITICAL",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "rising pore-water pressure",
+        "accelerating ground displacement",
+        "steep slope geometry susceptibility",
+        "historical slope instability scar"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 52.31,
+        "hourly_rainfall": 52.31,
+        "cumulative_rainfall": 321.94,
+        "antecedent_rainfall": 257.95,
+        "rainfall_duration": 17.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.328,
+        "saturation": 0.728,
+        "permeability": 0.018,
+        "pore_water_pressure": 36.17,
+        "infiltration_state": "moderate"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 35.8,
+        "u_final_kpa": 36.17,
+        "effective_stress_final_kpa": 0.1
+      },
+      "stability_state": {
+        "factor_of_safety": 0.748,
+        "risk_score": 0.76,
+        "risk_level": "CRITICAL",
+        "landslide_flag": true
+      },
+      "rank_score": 0.565
+    },
+    {
+      "zone_id": "DV-004",
+      "location_name": "Mathunli Village Slope",
+      "latitude": 28.751,
+      "longitude": 95.82,
+      "distance_from_current_incident": 4.42,
+      "current_risk": 0.65,
+      "predicted_risk": 0.75,
+      "risk_change": 0.1,
+      "current_level": "HIGH",
+      "predicted_level": "CRITICAL",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "high soil saturation & water content",
+        "rising pore-water pressure",
+        "accelerating ground displacement"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 54.0,
+        "hourly_rainfall": 54.0,
+        "cumulative_rainfall": 336.0,
+        "antecedent_rainfall": 266.4,
+        "rainfall_duration": 19.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.342,
+        "saturation": 0.761,
+        "permeability": 0.018,
+        "pore_water_pressure": 38.98,
+        "infiltration_state": "high_seepage"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 38.4,
+        "u_final_kpa": 38.98,
+        "effective_stress_final_kpa": 9.39
+      },
+      "stability_state": {
+        "factor_of_safety": 0.873,
+        "risk_score": 0.75,
+        "risk_level": "CRITICAL",
+        "landslide_flag": true
+      },
+      "rank_score": 0.56
+    },
+    {
+      "zone_id": "DV-001",
+      "location_name": "Anini High Pass Slope",
+      "latitude": 28.81,
+      "longitude": 95.845,
+      "distance_from_current_incident": 2.61,
+      "current_risk": 0.59,
+      "predicted_risk": 0.7,
+      "risk_change": 0.11,
+      "current_level": "HIGH",
+      "predicted_level": "HIGH",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "accelerating ground displacement",
+        "steep slope geometry susceptibility",
+        "historical slope instability scar"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 47.92,
+        "hourly_rainfall": 47.92,
+        "cumulative_rainfall": 296.97,
+        "antecedent_rainfall": 237.18,
+        "rainfall_duration": 18.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.314,
+        "saturation": 0.698,
+        "permeability": 0.018,
+        "pore_water_pressure": 32.43,
+        "infiltration_state": "moderate"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 32.1,
+        "u_final_kpa": 32.43,
+        "effective_stress_final_kpa": 0.1
+      },
+      "stability_state": {
+        "factor_of_safety": 0.766,
+        "risk_score": 0.7,
+        "risk_level": "HIGH",
+        "landslide_flag": true
+      },
+      "rank_score": 0.538
+    },
+    {
+      "zone_id": "DV-010",
+      "location_name": "Mathunli West Slope",
+      "latitude": 28.755,
+      "longitude": 95.805,
+      "distance_from_current_incident": 4.66,
+      "current_risk": 0.55,
+      "predicted_risk": 0.66,
+      "risk_change": 0.11,
+      "current_level": "HIGH",
+      "predicted_level": "HIGH",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "accelerating ground displacement"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 46.58,
+        "hourly_rainfall": 46.58,
+        "cumulative_rainfall": 284.53,
+        "antecedent_rainfall": 227.02,
+        "rainfall_duration": 16.5,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.302,
+        "saturation": 0.672,
+        "permeability": 0.018,
+        "pore_water_pressure": 31.11,
+        "infiltration_state": "moderate"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 30.5,
+        "u_final_kpa": 31.11,
+        "effective_stress_final_kpa": 13.21
+      },
+      "stability_state": {
+        "factor_of_safety": 0.567,
+        "risk_score": 0.66,
+        "risk_level": "HIGH",
+        "landslide_flag": true
+      },
+      "rank_score": 0.518
+    },
+    {
+      "zone_id": "DV-002",
+      "location_name": "Etalin North Ridge",
+      "latitude": 28.74,
+      "longitude": 95.85,
+      "distance_from_current_incident": 5.71,
+      "current_risk": 0.51,
+      "predicted_risk": 0.63,
+      "risk_change": 0.12,
+      "current_level": "HIGH",
+      "predicted_level": "HIGH",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "accelerating ground displacement"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 40.5,
+        "hourly_rainfall": 40.5,
+        "cumulative_rainfall": 245.5,
+        "antecedent_rainfall": 195.8,
+        "rainfall_duration": 16.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.284,
+        "saturation": 0.631,
+        "permeability": 0.018,
+        "pore_water_pressure": 27.04,
+        "infiltration_state": "moderate"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 26.5,
+        "u_final_kpa": 27.04,
+        "effective_stress_final_kpa": 13.96
+      },
+      "stability_state": {
+        "factor_of_safety": 0.961,
+        "risk_score": 0.63,
+        "risk_level": "HIGH",
+        "landslide_flag": true
+      },
+      "rank_score": 0.507
+    },
+    {
+      "zone_id": "DV-009",
+      "location_name": "Etalin West Escarpment",
+      "latitude": 28.73,
+      "longitude": 95.83,
+      "distance_from_current_incident": 6.58,
+      "current_risk": 0.48,
+      "predicted_risk": 0.6,
+      "risk_change": 0.12,
+      "current_level": "MODERATE",
+      "predicted_level": "HIGH",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "accelerating ground displacement"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 37.8,
+        "hourly_rainfall": 37.8,
+        "cumulative_rainfall": 228.6,
+        "antecedent_rainfall": 182.48,
+        "rainfall_duration": 15.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.271,
+        "saturation": 0.602,
+        "permeability": 0.018,
+        "pore_water_pressure": 25.37,
+        "infiltration_state": "moderate"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 24.8,
+        "u_final_kpa": 25.37,
+        "effective_stress_final_kpa": 16.63
+      },
+      "stability_state": {
+        "factor_of_safety": 0.628,
+        "risk_score": 0.6,
+        "risk_level": "HIGH",
+        "landslide_flag": true
+      },
+      "rank_score": 0.492
+    },
+    {
+      "zone_id": "DV-015",
+      "location_name": "Dambuk Highway Pass Slope",
+      "latitude": 28.705,
+      "longitude": 95.815,
+      "distance_from_current_incident": 9.51,
+      "current_risk": 0.45,
+      "predicted_risk": 0.56,
+      "risk_change": 0.11,
+      "current_level": "MODERATE",
+      "predicted_level": "HIGH",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "accelerating ground displacement"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 37.12,
+        "hourly_rainfall": 37.12,
+        "cumulative_rainfall": 222.38,
+        "antecedent_rainfall": 176.9,
+        "rainfall_duration": 14.5,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.258,
+        "saturation": 0.574,
+        "permeability": 0.018,
+        "pore_water_pressure": 23.06,
+        "infiltration_state": "moderate"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 22.4,
+        "u_final_kpa": 23.06,
+        "effective_stress_final_kpa": 21.28
+      },
+      "stability_state": {
+        "factor_of_safety": 0.708,
+        "risk_score": 0.56,
+        "risk_level": "HIGH",
+        "landslide_flag": true
+      },
+      "rank_score": 0.469
+    },
+    {
+      "zone_id": "DV-003",
+      "location_name": "Dambuk Valley Riverbank",
+      "latitude": 28.71,
+      "longitude": 95.79,
+      "distance_from_current_incident": 9.74,
+      "current_risk": 0.41,
+      "predicted_risk": 0.53,
+      "risk_change": 0.12,
+      "current_level": "MODERATE",
+      "predicted_level": "HIGH",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "accelerating ground displacement"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 35.44,
+        "hourly_rainfall": 35.44,
+        "cumulative_rainfall": 210.31,
+        "antecedent_rainfall": 167.45,
+        "rainfall_duration": 14.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.254,
+        "saturation": 0.564,
+        "permeability": 0.018,
+        "pore_water_pressure": 21.74,
+        "infiltration_state": "moderate"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 21.0,
+        "u_final_kpa": 21.74,
+        "effective_stress_final_kpa": 26.44
+      },
+      "stability_state": {
+        "factor_of_safety": 0.804,
+        "risk_score": 0.53,
+        "risk_level": "HIGH",
+        "landslide_flag": true
+      },
+      "rank_score": 0.457
+    },
+    {
+      "zone_id": "DV-012",
+      "location_name": "Anini Reservoir Flank",
+      "latitude": 28.82,
+      "longitude": 95.81,
+      "distance_from_current_incident": 4.09,
+      "current_risk": 0.37,
+      "predicted_risk": 0.49,
+      "risk_change": 0.12,
+      "current_level": "MODERATE",
+      "predicted_level": "MODERATE",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "accelerating ground displacement"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 32.06,
+        "hourly_rainfall": 32.06,
+        "cumulative_rainfall": 191.19,
+        "antecedent_rainfall": 150.55,
+        "rainfall_duration": 13.0,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.236,
+        "saturation": 0.524,
+        "permeability": 0.018,
+        "pore_water_pressure": 18.9,
+        "infiltration_state": "moderate"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 18.2,
+        "u_final_kpa": 18.9,
+        "effective_stress_final_kpa": 27.37
+      },
+      "stability_state": {
+        "factor_of_safety": 0.822,
+        "risk_score": 0.49,
+        "risk_level": "MODERATE",
+        "landslide_flag": true
+      },
+      "rank_score": 0.437
+    },
+    {
+      "zone_id": "DV-013",
+      "location_name": "Etalin Powerstation Approach",
+      "latitude": 28.725,
+      "longitude": 95.86,
+      "distance_from_current_incident": 7.6,
+      "current_risk": 0.22,
+      "predicted_risk": 0.35,
+      "risk_change": 0.13,
+      "current_level": "LOW",
+      "predicted_level": "MODERATE",
+      "prediction_horizon": "3\u20136 hours",
+      "simulation_confidence": "84% (SIMULATION CONFIDENCE - PROTOTYPE / UNCALIBRATED)",
+      "dominant_factors": [
+        "increasing rainfall intensity",
+        "accelerating ground displacement"
+      ],
+      "displacement_trend": "RAPIDLY_ACCELERATING",
+      "rainfall_state": {
+        "rainfall_intensity": 25.31,
+        "hourly_rainfall": 25.31,
+        "cumulative_rainfall": 146.94,
+        "antecedent_rainfall": 115.75,
+        "rainfall_duration": 11.5,
+        "forecast_rainfall": 0.0
+      },
+      "soil_moisture_state": {
+        "soil_moisture": 0.182,
+        "saturation": 0.404,
+        "permeability": 0.018,
+        "pore_water_pressure": 12.77,
+        "infiltration_state": "low"
+      },
+      "pore_pressure_state": {
+        "u_initial_kpa": 12.0,
+        "u_final_kpa": 12.77,
+        "effective_stress_final_kpa": 35.45
+      },
+      "stability_state": {
+        "factor_of_safety": 1.013,
+        "risk_score": 0.35,
+        "risk_level": "MODERATE",
+        "landslide_flag": true
+      },
+      "rank_score": 0.37
+    }
+  ]
+}

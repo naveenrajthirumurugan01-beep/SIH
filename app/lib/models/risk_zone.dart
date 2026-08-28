@@ -108,4 +108,32 @@ class RiskZone {
         'soil_moisture_factor': soilMoistureFactor,
         'history_factor': historyFactor,
       };
+
+  RiskZone copyWith({
+    double? riskScore,
+    RiskLevel? level,
+    double? radiusKm,
+    String? notes,
+    String? rainfallFactor,
+    String? soilMoistureFactor,
+  }) {
+    final newScore = riskScore ?? this.riskScore;
+    return RiskZone(
+      id: id,
+      name: name,
+      lat: lat,
+      lng: lng,
+      radiusKm: radiusKm ?? this.radiusKm,
+      riskScore: newScore,
+      level: level ?? RiskLevelX.fromScore(newScore),
+      district: district,
+      updatedAt: updatedAt,
+      notes: notes ?? this.notes,
+      polygonPoints: polygonPoints,
+      slopeFactor: slopeFactor,
+      rainfallFactor: rainfallFactor ?? this.rainfallFactor,
+      soilMoistureFactor: soilMoistureFactor ?? this.soilMoistureFactor,
+      historyFactor: historyFactor,
+    );
+  }
 }

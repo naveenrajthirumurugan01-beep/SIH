@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
@@ -47,10 +48,22 @@ class _GisMapWidgetState extends State<GisMapWidget> {
   // Location state
   LatLng? _userLocation;
 
+  // Time-Based Dynamic Satellite/Risk Timeline State
+  String _selectedTimeStep = 'NOW';
+  bool _isPlaying = false;
+  Timer? _playbackTimer;
+  static const List<String> _timeSteps = ['NOW', '+6h', '+12h', '+18h', '+24h'];
+
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _playbackTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -63,6 +76,34 @@ class _GisMapWidgetState extends State<GisMapWidget> {
       _zones = zones;
       _userLocation = loc;
     });
+  }
+
+  Future<void> _loadTemporalData(String stepKey) async {
+    final appState = context.read<AppState>();
+    final zones = await appState.riskRepository.getTemporalRiskZones(stepKey);
+    if (!mounted) return;
+    setState(() {
+      _zones = zones;
+      _selectedTimeStep = stepKey;
+    });
+  }
+
+  void _togglePlayback() {
+    if (_isPlaying) {
+      _playbackTimer?.cancel();
+      setState(() => _isPlaying = false);
+    } else {
+      setState(() => _isPlaying = true);
+      _playbackTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) {
+        final currentIndex = _timeSteps.indexOf(_selectedTimeStep);
+        if (currentIndex < _timeSteps.length - 1) {
+          _loadTemporalData(_timeSteps[currentIndex + 1]);
+        } else {
+          _playbackTimer?.cancel();
+          setState(() => _isPlaying = false);
+        }
+      });
+    }
   }
 
   void _recenterGps() {
@@ -236,6 +277,16 @@ class _GisMapWidgetState extends State<GisMapWidget> {
   bool _isInsideGeofence(RiskZone z, LatLng userLoc) {
     final distKm = _distance.as(LengthUnit.Kilometer, userLoc, LatLng(z.lat, z.lng));
     return distKm <= _geofenceRadiusKm;
+  }
+
+  String? _forecastAlertMessage(LatLng userLoc) {
+    if (_selectedTimeStep == 'NOW') return null;
+    for (final z in _zones) {
+      if (_isInsideGeofence(z, userLoc) && (z.level == RiskLevel.critical || z.riskScore >= 0.75)) {
+        return 'Forecast ($_selectedTimeStep): Critical risk (${z.riskScore.toStringAsFixed(2)}) near ${z.name.replaceAll("Near ", "")} within monitoring area';
+      }
+    }
+    return null;
   }
 
   @override
@@ -469,7 +520,7 @@ class _GisMapWidgetState extends State<GisMapWidget> {
             // ── 3. RIGHT FLOATING ACTION BUTTONS ─────────────────────────────
             Positioned(
               right: 10,
-              bottom: 34,
+              bottom: 95,
               child: Column(
                 children: [
                   _MapControlBtn(
@@ -499,7 +550,7 @@ class _GisMapWidgetState extends State<GisMapWidget> {
             // ── 4. COMPACT LEGEND (Left Side Overlay) ────────────────────────
             Positioned(
               left: 10,
-              bottom: 34,
+              bottom: 95,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
@@ -519,7 +570,116 @@ class _GisMapWidgetState extends State<GisMapWidget> {
               ),
             ),
 
-            // ── 5. BOTTOM GPS LOCATION BAR ───────────────────────────────────
+            // ── 5. TIME-BASED DYNAMIC RISK MONITORING TIMELINE OVERLAY ────────
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 25,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(210),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white24, width: 0.8),
+                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 6)],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Forecast Header + Non-destructive Forecast Preview
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule, color: Colors.tealAccent, size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Risk Forecast: ${_selectedTimeStep == "NOW" ? "NOW" : "${_selectedTimeStep.toUpperCase()} HOURS"}',
+                          style: const TextStyle(color: Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _togglePlayback,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _isPlaying ? Colors.orange.shade800 : CitizenTheme.primary,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 12),
+                                const SizedBox(width: 2),
+                                Text(
+                                  _isPlaying ? 'PAUSE' : 'PLAY 6H',
+                                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (_forecastAlertMessage(userLoc) != null) ...[
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withAlpha(50),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.redAccent.withAlpha(120), width: 0.8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 11),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _forecastAlertMessage(userLoc)!,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 5),
+
+                    // Segmented Timeline Track (NOW -> +6h -> +12h -> +18h -> +24h)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        for (final step in _timeSteps)
+                          GestureDetector(
+                            onTap: () => _loadTemporalData(step),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: _selectedTimeStep == step ? CitizenTheme.primary : Colors.white12,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _selectedTimeStep == step ? Colors.tealAccent : Colors.transparent,
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: Text(
+                                step,
+                                style: TextStyle(
+                                  color: _selectedTimeStep == step ? Colors.white : Colors.white70,
+                                  fontSize: 9,
+                                  fontWeight: _selectedTimeStep == step ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── 6. BOTTOM GPS LOCATION BAR ───────────────────────────────────
             Positioned(
               left: 0,
               right: 0,
