@@ -46,7 +46,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final appState = context.read<AppState>();
-    await appState.refreshLocation();
+    
+    // Background location refresh (non-blocking for UI render)
+    appState.refreshLocation().catchError((_) {});
 
     final alerts = await appState.alertRepository.getAlerts();
 

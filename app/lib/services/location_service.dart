@@ -184,8 +184,12 @@ class LocationService {
   Future<LocationPermission> requestPermission() => Geolocator.requestPermission();
 
   Future<LatLng> getCurrentOrFallback() async {
-    final fix = await getFieldGpsFix();
-    return LatLng(fix.latitude, fix.longitude);
+    try {
+      final fix = await getFieldGpsFix().timeout(const Duration(seconds: 2));
+      return LatLng(fix.latitude, fix.longitude);
+    } catch (_) {
+      return studyAreaCenter;
+    }
   }
 
   Stream<LatLng> watchPosition({int distanceFilterMeters = 5}) async* {
