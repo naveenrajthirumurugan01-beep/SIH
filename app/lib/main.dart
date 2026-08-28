@@ -9,73 +9,69 @@ import 'models/user_role.dart';
 import 'screens/analyst/analyst_shell.dart';
 import 'screens/citizen/citizen_shell.dart';
 import 'screens/field/field_officer_shell.dart';
-import 'screens/role_select_screen.dart';
-
-import 'services/field_officer_sync_service.dart';
+import 'screens/role_entry_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Real Firebase project (ner-landslide-ews) — see lib/firebase_options.dart.
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  } catch (e) {
+    debugPrint('Firebase init fallback: $e');
+  }
 
   final appState = await AppState.create();
-  final syncService = FieldOfficerSyncService();
-  await syncService.initialize();
 
-  runApp(LandslideEwsApp(appState: appState, syncService: syncService));
+  runApp(LandslideEwsApp(appState: appState));
 }
 
 class LandslideEwsApp extends StatelessWidget {
   final AppState appState;
-  final FieldOfficerSyncService syncService;
 
-  const LandslideEwsApp({
-    super.key,
-    required this.appState,
-    required this.syncService,
-  });
+  const LandslideEwsApp({super.key, required this.appState});
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: appState),
-        ChangeNotifierProvider.value(value: syncService),
-      ],
+    return ChangeNotifierProvider.value(
+      value: appState,
       child: MaterialApp(
         title: 'NER Landslide EWS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
-        home: const _AuthRouter(),
+        home: const _RoleRouter(),
       ),
     );
   }
 }
 
-/// Routes purely off AppState.currentUser, which mirrors Firebase Auth +
-/// the matching Firestore profile (see AuthRepository.currentAppUser):
-/// signed out -> RoleSelectScreen; signed in -> the shell matching their
-/// (real, Firestore-backed) role.
-class _AuthRouter extends StatelessWidget {
-  const _AuthRouter();
+class _RoleRouter extends StatelessWidget {
+  const _RoleRouter();
 
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final role = appState.currentRole;
 
-    if (!appState.authResolved) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+    if (role == null) return const RoleEntryScreen();
+    if (role == UserRole.fieldOfficial) return const FieldOfficerShell();
+    if (role == UserRole.analystAdmin) return const AnalystShell();
 
-    final user = appState.currentUser;
-    if (user == null) return const RoleSelectScreen();
-
-    return switch (user.role) {
-      UserRole.fieldOfficial => const FieldOfficerShell(),
-      UserRole.analystAdmin => const AnalystShell(),
-      UserRole.citizen => const CitizenShell(),
-    };
+    return Stack(
+      children: [
+        const CitizenShell(),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: SafeArea(
+            child: IconButton.filledTonal(
+              icon: const Icon(Icons.swap_horiz),
+              tooltip: 'Switch role (demo)',
+              onPressed: appState.clearRole,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -6,7 +6,6 @@ import '../models/risk_zone.dart';
 
 abstract class RiskRepository {
   Future<List<RiskZone>> getRiskZones();
-  Future<List<RiskZone>> getTemporalRiskZones(String stepKey);
   Future<RiskZone?> getNearestZone(double lat, double lng);
 }
 
@@ -146,52 +145,6 @@ class MockRiskRepository implements RiskRepository {
   }
 
   @override
-  Future<List<RiskZone>> getTemporalRiskZones(String stepKey) async {
-    await Future<void>.delayed(const Duration(milliseconds: 30));
-    switch (stepKey) {
-      case '+6h':
-        return [
-          _zones[0].copyWith(riskScore: 0.89, rainfallFactor: 'EXTREME'),
-          _zones[1].copyWith(riskScore: 0.77, level: RiskLevel.critical),
-          _zones[2].copyWith(riskScore: 0.84),
-          _zones[3].copyWith(riskScore: 0.58, level: RiskLevel.high, notes: 'Forecast (+6h): Soil saturation rising.'),
-          _zones[4].copyWith(riskScore: 0.22),
-        ];
-      case '+12h':
-        return [
-          _zones[0].copyWith(riskScore: 0.92, radiusKm: 3.8),
-          _zones[1].copyWith(riskScore: 0.83, level: RiskLevel.critical),
-          _zones[2].copyWith(riskScore: 0.87),
-          _zones[3].copyWith(riskScore: 0.69, level: RiskLevel.high, notes: 'Forecast (+12h): Accelerating movement.'),
-          _zones[4].copyWith(riskScore: 0.31, level: RiskLevel.moderate),
-        ];
-      case '+18h':
-        return [
-          _zones[0].copyWith(riskScore: 0.95, radiusKm: 4.0),
-          _zones[1].copyWith(riskScore: 0.88, level: RiskLevel.critical),
-          _zones[2].copyWith(riskScore: 0.90),
-          _zones[3].copyWith(
-            riskScore: 0.78,
-            level: RiskLevel.critical,
-            notes: 'Forecast (+18h): EMERGING CRITICAL RISK near Mathunli Village!',
-          ),
-          _zones[4].copyWith(riskScore: 0.42, level: RiskLevel.moderate),
-        ];
-      case '+24h':
-        return [
-          _zones[0].copyWith(riskScore: 0.91),
-          _zones[1].copyWith(riskScore: 0.84),
-          _zones[2].copyWith(riskScore: 0.86),
-          _zones[3].copyWith(riskScore: 0.74, level: RiskLevel.high),
-          _zones[4].copyWith(riskScore: 0.36, level: RiskLevel.moderate),
-        ];
-      case 'NOW':
-      default:
-        return List.unmodifiable(_zones);
-    }
-  }
-
-  @override
   Future<RiskZone?> getNearestZone(double lat, double lng) async {
     if (_zones.isEmpty) return null;
     RiskZone? nearest;
@@ -218,11 +171,6 @@ class FirestoreRiskRepository implements RiskRepository {
     return snapshot.docs
         .map((doc) => RiskZone.fromFirestore(doc.id, doc.data()))
         .toList();
-  }
-
-  @override
-  Future<List<RiskZone>> getTemporalRiskZones(String stepKey) async {
-    return getRiskZones();
   }
 
   @override

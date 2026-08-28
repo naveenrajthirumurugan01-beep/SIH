@@ -50,6 +50,9 @@ class AppState extends ChangeNotifier {
   AppUser? _currentUser;
   AppUser? get currentUser => _currentUser;
 
+  UserRole? _currentRole;
+  UserRole? get currentRole => _currentRole;
+
   bool _authResolved = false;
   bool get authResolved => _authResolved;
 
@@ -96,10 +99,12 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> setRole(UserRole role, {String? officerName, String? officerId}) async {
+    _currentRole = role;
     notifyListeners();
   }
 
   Future<void> clearRole() async {
+    _currentRole = null;
     notifyListeners();
   }
 
